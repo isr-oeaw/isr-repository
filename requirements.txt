@@ -2,6 +2,7 @@ Django>=5.2.6
 psycopg2-binary>=2.9
 gdal==3.6.2
 uvicorn[standard]>=0.27.0
+gunicorn>=22.0.0
 django-allauth>=0.57.0
 django-auditlog>=2.2.0
 requests>=2.31.0

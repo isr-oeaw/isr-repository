@@ -315,8 +315,21 @@ The application is configured to handle large file uploads up to 100GB:
 
 - **Nginx**: `client_max_body_size 100G`
 - **Django**: `MAX_DATASET_UPLOAD_SIZE` / `DATA_UPLOAD_MAX_MEMORY_SIZE` set to 100GB
-- **Timeouts**: Extended to 3600s (1 hour) for large uploads
+- **Production app server**: gunicorn/WSGI (not uvicorn/ASGI) so large files stream to disk instead of being buffered in RAM
+- **Gunicorn**: 3 workers, `--timeout 3600` (1 hour)
+- **Nginx timeouts**: Extended to 3600s (1 hour) for large uploads
 - **Proxy**: Buffering disabled for better performance
+- **Traefik**: `responseforwarding.flushinterval=100ms` on the nginx service; host `default@file` middleware timeouts must also allow long uploads
+
+### Why production uses gunicorn/WSGI
+
+Django's ASGI handler reads the entire request body into memory before upload handlers run. A multi-GB POST can OOM-kill the worker and return **502 Bad Gateway**. WSGI streams large uploads to `media/tmp` via `TemporaryUploadedFile`, which is required for files above a few GB.
+
+**Production command** (`docker-compose.prod.yml`):
+
+```bash
+gunicorn main.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3600 --graceful-timeout 30 --keep-alive 5
+```
 
 ### Configuration Details
 
@@ -374,10 +387,16 @@ docker compose -f docker-compose.prod.yml restart nginx
 
 | Component | Limit | Timeout | Status |
 |-----------|-------|---------|---------|
-| **Nginx** | 100GB | 3600s | ✅ Configured |
-| **Django Data** | 100GB | - | ✅ Configured |
-| **Django Memory Spill** | 10MB | - | ✅ Configured |
-| **Proxy Buffering** | Disabled | - | ✅ Optimized |
+| **Gunicorn (WSGI)** | - | 3600s | Configured |
+| **Nginx** | 100GB | 3600s | Configured |
+| **Django Data** | 100GB | - | Configured |
+| **Django Memory Spill** | 10MB | - | Configured |
+| **Proxy Buffering** | Disabled | - | Optimized |
+| **Traefik (host)** | - | Must match | Check `default@file` middleware |
+
+### Traefik on the host
+
+The router uses `default@file` middleware (outside this repo). For uploads over several GB, ensure Traefik entrypoint / middleware `respondingTimeouts.readTimeout` and `idleTimeout` are at least **3600s**, and that no body-size limit blocks the request before it reaches nginx.
 
 ### Troubleshooting Upload Issues
 
@@ -387,9 +406,9 @@ docker compose -f docker-compose.prod.yml restart nginx
    - **Cause**: File exceeds nginx `client_max_body_size`
    - **Solution**: Check nginx configuration and restart service
 
-2. **504 Gateway Timeout**
-   - **Cause**: Upload takes longer than timeout settings
-   - **Solution**: Increase timeout values in nginx configuration
+2. **502 Bad Gateway / 504 Gateway Timeout**
+   - **Cause**: App worker killed (often ASGI RAM buffering) or proxy timeout while waiting for Django to finish saving the file
+   - **Solution**: Use gunicorn/WSGI in production, confirm gunicorn and nginx timeouts are 3600s, raise Traefik `default@file` timeouts on the host
 
 3. **500 Internal Server Error**
    - **Cause**: Django or disk space issues
