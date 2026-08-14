@@ -241,13 +241,18 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # File Upload Settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 1024  # 1GB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024 * 1024  # 1GB
+MAX_DATASET_UPLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100GB total request body for dataset versions
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_DATASET_UPLOAD_SIZE  # hard request-body cap
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # spill to disk above 10MB
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
+FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'tmp')
 
 # Large file upload settings
 FILE_UPLOAD_PERMISSIONS = 0o644
 FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
+
+# Ensure upload temp directory exists on the media volume
+os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
 
 API_URL = ''
 

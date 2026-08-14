@@ -333,6 +333,59 @@ class DatasetVersionFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('Please do not upload files when using the external URL method.', form.non_field_errors())
 
+    def test_form_rejects_oversized_file_upload(self):
+        """Ensure files larger than MAX_DATASET_UPLOAD_SIZE are rejected."""
+        from unittest.mock import patch
+        from django.conf import settings
+
+        oversized_file = SimpleUploadedFile('large.csv', b'data')
+        oversized_file.size = settings.MAX_DATASET_UPLOAD_SIZE + 1
+
+        form = DatasetVersionForm(
+            data={
+                'version_number': '1.0',
+                'description': 'Too large',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+            },
+            files=MultiValueDict({'files': [oversized_file]}),
+            dataset=self.dataset,
+        )
+
+        with patch.object(settings, 'MAX_DATASET_UPLOAD_SIZE', 1024):
+            self.assertFalse(form.is_valid())
+            self.assertIn('files', form.errors)
+
+    def test_form_rejects_oversized_total_upload(self):
+        """Ensure total upload size over MAX_DATASET_UPLOAD_SIZE is rejected."""
+        from unittest.mock import patch
+        from django.conf import settings
+
+        file_one = SimpleUploadedFile('part1.csv', b'data')
+        file_two = SimpleUploadedFile('part2.csv', b'data')
+        file_one.size = 600
+        file_two.size = 600
+
+        form = DatasetVersionForm(
+            data={
+                'version_number': '1.0',
+                'description': 'Total too large',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+            },
+            files=MultiValueDict({'files': [file_one, file_two]}),
+            dataset=self.dataset,
+        )
+
+        with patch.object(settings, 'MAX_DATASET_UPLOAD_SIZE', 1000):
+            self.assertFalse(form.is_valid())
+            self.assertIn('files', form.errors)
+            self.assertIn('Total upload size', form.errors['files'][0])
+
     def test_form_accepts_supported_file_formats(self):
         """Test that the form accepts all supported file formats including .dta and .rds"""
         # All supported file formats

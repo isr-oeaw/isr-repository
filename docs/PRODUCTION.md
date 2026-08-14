@@ -311,27 +311,27 @@ docker system prune -f
 
 ### Upload Limits
 
-The application is configured to handle large file uploads up to 1GB:
+The application is configured to handle large file uploads up to 100GB:
 
-- **Nginx**: `client_max_body_size 1G`
-- **Django**: Optimized memory settings for large files
-- **Timeouts**: Extended to 300s (5 minutes) for large uploads
+- **Nginx**: `client_max_body_size 100G`
+- **Django**: `MAX_DATASET_UPLOAD_SIZE` / `DATA_UPLOAD_MAX_MEMORY_SIZE` set to 100GB
+- **Timeouts**: Extended to 3600s (1 hour) for large uploads
 - **Proxy**: Buffering disabled for better performance
 
 ### Configuration Details
 
 **Nginx Settings** (`nginx/nginx.conf`):
 ```nginx
-# Allow large file uploads up to 1GB
-client_max_body_size 1G;
+# Allow large file uploads up to 100GB
+client_max_body_size 100G;
 
 # Increase timeouts for large file uploads
-client_body_timeout 300s;
-client_header_timeout 300s;
-proxy_connect_timeout 300s;
-proxy_send_timeout 300s;
-proxy_read_timeout 300s;
-send_timeout 300s;
+client_body_timeout 3600s;
+client_header_timeout 3600s;
+proxy_connect_timeout 3600s;
+proxy_send_timeout 3600s;
+proxy_read_timeout 3600s;
+send_timeout 3600s;
 
 # Additional proxy settings for large uploads
 proxy_request_buffering off;
@@ -341,8 +341,10 @@ proxy_buffering off;
 **Django Settings** (`app/main/settings.py`):
 ```python
 # File Upload Settings
-FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+MAX_DATASET_UPLOAD_SIZE = 100 * 1024 * 1024 * 1024  # 100GB
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_DATASET_UPLOAD_SIZE
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # spill to disk above 10MB
+FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'tmp')
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 # Large file upload settings
@@ -372,9 +374,9 @@ docker compose -f docker-compose.prod.yml restart nginx
 
 | Component | Limit | Timeout | Status |
 |-----------|-------|---------|---------|
-| **Nginx** | 1GB | 300s | ✅ Configured |
-| **Django Memory** | 100MB | - | ✅ Configured |
-| **Django Data** | 100MB | - | ✅ Configured |
+| **Nginx** | 100GB | 3600s | ✅ Configured |
+| **Django Data** | 100GB | - | ✅ Configured |
+| **Django Memory Spill** | 10MB | - | ✅ Configured |
 | **Proxy Buffering** | Disabled | - | ✅ Optimized |
 
 ### Troubleshooting Upload Issues
