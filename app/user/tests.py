@@ -10,7 +10,7 @@ import json
 
 from .models import Role, APIKey
 from .forms import (
-    CustomUserCreationForm, CustomUserEditForm, UserProfileForm, 
+    CustomUserCreationForm, AdminUserCreateForm, CustomUserEditForm, UserProfileForm,
     UserSettingsForm, UserNotificationForm, DataExportForm, RoleForm, RoleFilterForm,
     APIKeyCreateForm, APIKeyRevokeForm
 )
@@ -682,6 +682,30 @@ class UserFormTests(TestCase):
         user = form.save()
         self.assertTrue(user.is_approved)  # Auto-approved by admin
     
+    def test_admin_user_create_form_valid_data(self):
+        """Test AdminUserCreateForm creates an approved user without a password."""
+        form_data = {
+            'username': 'inviteduser',
+            'email': 'inviteduser@example.com',
+            'first_name': 'Invited',
+            'last_name': 'User',
+            'role': self.role.id,
+        }
+
+        form = AdminUserCreateForm(data=form_data)
+        self.assertTrue(form.is_valid())
+
+        user = form.save()
+        self.assertEqual(user.username, 'inviteduser')
+        self.assertEqual(user.email, 'inviteduser@example.com')
+        self.assertTrue(user.is_approved)
+        self.assertFalse(user.has_usable_password())
+
+        from allauth.account.models import EmailAddress
+        email_address = EmailAddress.objects.get(user=user, email=user.email)
+        self.assertTrue(email_address.verified)
+        self.assertTrue(email_address.primary)
+
     def test_custom_user_creation_form_invalid_data(self):
         """Test CustomUserCreationForm with invalid data"""
         form_data = {
@@ -1261,27 +1285,36 @@ class UserViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'user/user_form.html')
     
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_user_create_view_post_valid_data(self):
         """Test POST request to user create view with valid data"""
+        from django.core import mail
+
         self.client.login(username='admin', password='adminpass123')
-        
+
         form_data = {
             'username': 'newuser',
             'email': 'newuser@example.com',
             'first_name': 'New',
             'last_name': 'User',
-            'password1': 'complexpass123',
-            'password2': 'complexpass123',
             'role': self.role.id
         }
-        
+
         response = self.client.post(reverse('user-create'), form_data)
         self.assertEqual(response.status_code, 302)  # Redirect
-        
+
         # Check user was created and approved
         self.assertTrue(self.User.objects.filter(username='newuser').exists())
         user = self.User.objects.get(username='newuser')
         self.assertTrue(user.is_approved)  # Auto-approved by admin
+        self.assertFalse(user.has_usable_password())
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertIn('newuser@example.com', message.to)
+        self.assertIn('newuser', message.body)
+        self.assertIn('newuser@example.com', message.body)
+        self.assertIn('/password/reset/key/', message.body)
     
     def test_user_edit_view_requires_permission(self):
         """Test that user edit view requires admin permission"""
@@ -1595,18 +1628,18 @@ class UserIntegrationTests(TestCase):
             'email': 'newuser@example.com',
             'first_name': 'New',
             'last_name': 'User',
-            'password1': 'complexpass123',
-            'password2': 'complexpass123',
             'role': self.role.id
         }
         
-        response = self.client.post(reverse('user-create'), create_data)
+        with override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'):
+            response = self.client.post(reverse('user-create'), create_data)
         self.assertEqual(response.status_code, 302)  # Redirect
         
         # Check user was created and approved
         self.assertTrue(self.User.objects.filter(username='newuser').exists())
         new_user = self.User.objects.get(username='newuser')
         self.assertTrue(new_user.is_approved)
+        self.assertFalse(new_user.has_usable_password())
         
         # Step 4: Admin edits user
         edit_data = {

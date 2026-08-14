@@ -1,0 +1,15 @@
+{% load i18n %}{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},
+
+{% blocktrans %}An administrator has created an account for you on {{ site_name }}. Please set your password using the link below before signing in.{% endblocktrans %}
+
+{% trans "Your account details" %}:
+{% trans "Username" %}: {{ username }}
+{% trans "Email" %}: {{ email }}
+{% if role_name %}{% trans "Role" %}: {{ role_name }}
+{% endif %}{% trans "Login page" %}: {{ login_url }}
+
+{% trans "Set your password" %}: {{ password_set_url }}
+
+{% trans "Important: You will not be able to sign in until you have set your password using the link above." %}
+
+{% trans "This is an automated message, please do not reply to this email." %}
