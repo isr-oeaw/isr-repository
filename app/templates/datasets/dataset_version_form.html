@@ -299,6 +299,9 @@ let isUploading = false;
 let uploadPromises = [];
 const MAX_DATASET_UPLOAD_SIZE = {{ max_dataset_upload_size }};
 const MAX_DATASET_UPLOAD_SIZE_GB = Math.round(MAX_DATASET_UPLOAD_SIZE / (1024 * 1024 * 1024));
+const CHUNK_UPLOAD_URL = '{{ chunk_upload_url|escapejs }}';
+const CHUNK_SIZE = 8 * 1024 * 1024;
+const CHUNKED_UPLOAD_THRESHOLD = 32 * 1024 * 1024;
 
 function validateUploadSize(files) {
     const fileList = Array.from(files || []);
@@ -602,6 +605,252 @@ function handleFileSelection() {
     });
 }
 
+function generateUploadId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+async function postChunkWithRetry(formData, retries = 1) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(CHUNK_UPLOAD_URL, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                throw new Error(`{% trans "Chunk upload failed" %} (HTTP ${response.status})`);
+            }
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || `{% trans "Chunk upload failed" %} (HTTP ${response.status})`);
+            }
+            return data;
+        } catch (error) {
+            lastError = error;
+            if (attempt >= retries) {
+                throw lastError;
+            }
+        }
+    }
+    throw lastError || new Error('{% trans "Chunk upload failed" %}');
+}
+
+async function uploadFilesInChunks(files, uploadId, onProgress) {
+    let bytesSent = 0;
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    const chunkedFilesMeta = [];
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        const file = files[fileIndex];
+        const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+            const start = chunkIndex * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+
+            const formData = new FormData();
+            formData.append('upload_id', uploadId);
+            formData.append('file_index', fileIndex);
+            formData.append('chunk_index', chunkIndex);
+            formData.append('total_chunks', totalChunks);
+            formData.append('filename', file.name);
+            formData.append('file', chunk, file.name);
+            formData.append('csrfmiddlewaretoken', csrfToken);
+
+            await postChunkWithRetry(formData, 1);
+            bytesSent += chunk.size;
+            if (onProgress) {
+                onProgress(bytesSent, totalSize);
+            }
+        }
+
+        chunkedFilesMeta.push({
+            file_index: fileIndex,
+            filename: file.name,
+            file_size: file.size,
+        });
+    }
+
+    return chunkedFilesMeta;
+}
+
+function handleUploadXhrResponse(xhr, submitBtn, submitBtnText, submitBtnSpinner, cancelBtn) {
+    console.log('Upload response status:', xhr.status);
+    console.log('Upload response headers:', xhr.getAllResponseHeaders());
+    console.log('Upload response text (first 1000 chars):', xhr.responseText ? xhr.responseText.substring(0, 1000) : '(empty)');
+
+    if (xhr.status === 200) {
+        try {
+            const response = JSON.parse(xhr.responseText);
+            console.log('Parsed JSON response:', response);
+
+            if (response.success && response.redirect_url) {
+                window.location.href = response.redirect_url;
+            } else if (response.error) {
+                let errorMessage = response.error;
+
+                if (response.errors) {
+                    errorMessage += '\n\nField errors:';
+                    for (const [field, errors] of Object.entries(response.errors)) {
+                        errorMessage += `\n- ${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`;
+                    }
+                }
+
+                if (response.non_field_errors && response.non_field_errors.length > 0) {
+                    errorMessage += '\n\nGeneral errors: ' + response.non_field_errors.join(', ');
+                }
+
+                if (response.error_details) {
+                    console.error('Detailed error:', response.error_details);
+                    errorMessage += '\n\n[Check browser console for full details]';
+                }
+
+                updateUploadStatusText('{% trans "Upload failed" %}: ' + response.error);
+                alert(errorMessage);
+                reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+            } else {
+                console.warn('Unexpected response format:', response);
+                updateUploadStatusText('{% trans "Unexpected response from server" %}');
+                alert('{% trans "Unexpected response from server. Please check the console for details." %}');
+                reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+            }
+        } catch (e) {
+            console.log('Response is not JSON, parsing as HTML. Error:', e);
+            if (xhr.responseURL) {
+                window.location.href = xhr.responseURL;
+            } else {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(xhr.responseText, 'text/html');
+                const errorElements = doc.querySelectorAll('.alert-danger, .error, .invalid-feedback, .non-field-errors');
+                let errorText = '{% trans "An error occurred. Server returned HTML response." %}';
+                if (errorElements.length > 0) {
+                    errorText += '\n\n' + Array.from(errorElements).map(el => el.textContent.trim()).filter(text => text.length > 0).join('\n');
+                }
+                updateUploadStatusText('{% trans "Upload failed" %}');
+                alert(errorText + '\n\n[Full response logged to console]');
+                console.error('HTML response:', xhr.responseText);
+                reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+            }
+        }
+    } else if (xhr.status === 302) {
+        const location = xhr.getResponseHeader('Location');
+        if (location) {
+            window.location.href = location;
+        } else if (xhr.responseURL) {
+            window.location.href = xhr.responseURL;
+        } else {
+            window.location.href = window.location.href;
+        }
+    } else if (xhr.status === 413) {
+        let errorMessage = '{% trans "Upload failed: File is too large" %}';
+        let details = '';
+        const fileInput = document.getElementById('{{ form.files.id_for_label }}');
+        if (fileInput && fileInput.files) {
+            let totalSize = 0;
+            Array.from(fileInput.files).forEach(file => {
+                totalSize += file.size;
+            });
+            const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+            const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
+            details = `\n\n{% trans "Total file size" %}: ${totalSizeGB} GB (${totalSizeMB} MB)`;
+            details += `\n{% trans "Maximum allowed size" %}: ${MAX_DATASET_UPLOAD_SIZE_GB} GB`;
+        }
+
+        errorMessage += details;
+        errorMessage += '\n\n{% trans "Please either:" %}';
+        errorMessage += '\n1. {% trans "Compress your files before uploading" %}';
+        errorMessage += '\n2. {% trans "Split into smaller files" %}';
+        errorMessage += '\n3. {% trans "Contact administrator if you need to upload larger files" %}';
+
+        updateUploadStatusText('{% trans "Upload failed: File too large" %}');
+        alert(errorMessage);
+        console.error('413 Request Entity Too Large - File size limit exceeded');
+        console.error('Response:', xhr.responseText);
+        reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+    } else if (xhr.status === 502 || xhr.status === 504) {
+        console.error(`${xhr.status} gateway error during upload`);
+        console.error('Response:', xhr.responseText);
+        showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+    } else {
+        let errorMessage = `{% trans "Upload failed" %} (HTTP ${xhr.status} ${xhr.statusText})`;
+
+        try {
+            const response = JSON.parse(xhr.responseText);
+            console.error('Error response:', response);
+            if (response.error) {
+                errorMessage = response.error;
+            }
+            if (response.errors) {
+                errorMessage += '\n\nField errors:';
+                for (const [field, errors] of Object.entries(response.errors)) {
+                    errorMessage += `\n- ${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`;
+                }
+            }
+            if (response.error_details) {
+                console.error('Error details:', response.error_details);
+                errorMessage += '\n\n[Check browser console for full details]';
+            }
+        } catch (e) {
+            errorMessage += '\n\nResponse: ' + (xhr.responseText ? xhr.responseText.substring(0, 500) : '(empty)');
+            console.error('Error response text:', xhr.responseText);
+        }
+
+        updateUploadStatusText(errorMessage);
+        alert(errorMessage + '\n\n{% trans "Please check the browser console for more details." %}');
+        reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+    }
+}
+
+function submitVersionCreateRequest(formData, submitBtn, submitBtnText, submitBtnSpinner, cancelBtn) {
+    const form = document.querySelector('form[method="post"]');
+    const xhr = new XMLHttpRequest();
+
+    xhr.addEventListener('load', () => {
+        handleUploadXhrResponse(xhr, submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+    });
+
+    xhr.addEventListener('error', () => {
+        console.error('Network error during upload');
+        console.error('Status:', xhr.status);
+        console.error('Status text:', xhr.statusText);
+        console.error('Response:', xhr.responseText);
+        console.error('Ready state:', xhr.readyState);
+
+        if (xhr.readyState === 4) {
+            showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+            return;
+        }
+
+        updateUploadStatusText('{% trans "Network error during upload" %}');
+        alert('{% trans "Network error during upload. Please check your connection and try again." %}\n\n{% trans "Check the browser console (F12) for more details." %}');
+        reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+    });
+
+    xhr.addEventListener('abort', () => {
+        updateUploadStatusText('{% trans "Upload cancelled" %}');
+        reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+    });
+
+    xhr.open('POST', form.action);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(formData);
+}
+
 function handleFormSubmission() {
     const form = document.querySelector('form[method="post"]');
     const submitBtn = document.getElementById('submit-btn');
@@ -650,17 +899,43 @@ function handleFormSubmission() {
         
         // Update status
         updateUploadStatusText('{% trans "Preparing files..." %}');
-        
-        // Upload files via AJAX
+
+        const files = Array.from(fileInput.files);
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+
+        if (totalSize > CHUNKED_UPLOAD_THRESHOLD) {
+            try {
+                const uploadId = generateUploadId();
+                updateUploadStatusText('{% trans "Uploading files in chunks..." %}');
+
+                const chunkedFilesMeta = await uploadFilesInChunks(files, uploadId, (sent, total) => {
+                    const percentComplete = Math.round((sent / total) * 100);
+                    updateUploadStatusText(`{% trans "Uploading" %}: ${percentComplete}% (${formatFileSize(sent)} / ${formatFileSize(total)})`);
+                });
+
+                updateUploadStatusText('{% trans "Creating version..." %}');
+
+                const formData = new FormData(form);
+                formData.delete('files');
+                formData.append('upload_id', uploadId);
+                formData.append('chunked_files', JSON.stringify(chunkedFilesMeta));
+
+                submitVersionCreateRequest(formData, submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+            } catch (error) {
+                console.error('Chunked upload failed:', error);
+                updateUploadStatusText('{% trans "Upload failed" %}');
+                alert(error.message || '{% trans "Chunk upload failed. Please try again." %}');
+                reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+            }
+            return;
+        }
+
+        // Upload files via AJAX (single request for smaller totals)
         const formData = new FormData(form);
         const xhr = new XMLHttpRequest();
         
         // Track overall progress
-        let totalSize = 0;
         let uploadedSize = 0;
-        Array.from(fileInput.files).forEach(file => {
-            totalSize += file.size;
-        });
         
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable && totalSize > 0) {
@@ -693,173 +968,16 @@ function handleFormSubmission() {
         });
         
         xhr.addEventListener('load', () => {
-            console.log('Upload response status:', xhr.status);
-            console.log('Upload response headers:', xhr.getAllResponseHeaders());
-            console.log('Upload response text (first 1000 chars):', xhr.responseText ? xhr.responseText.substring(0, 1000) : '(empty)');
-            
-            if (xhr.status === 200) {
-                // Check if response is JSON
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    console.log('Parsed JSON response:', response);
-                    
-                    if (response.success && response.redirect_url) {
-                        // Success - redirect
-                        window.location.href = response.redirect_url;
-                    } else if (response.error) {
-                        // Error response
-                        let errorMessage = response.error;
-                        
-                        // Add detailed error information if available
-                        if (response.errors) {
-                            errorMessage += '\n\nField errors:';
-                            for (const [field, errors] of Object.entries(response.errors)) {
-                                errorMessage += `\n- ${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`;
-                            }
-                        }
-                        
-                        if (response.non_field_errors && response.non_field_errors.length > 0) {
-                            errorMessage += '\n\nGeneral errors: ' + response.non_field_errors.join(', ');
-                        }
-                        
-                        if (response.error_details) {
-                            console.error('Detailed error:', response.error_details);
-                            errorMessage += '\n\n[Check browser console for full details]';
-                        }
-                        
-                        updateUploadStatusText('{% trans "Upload failed" %}: ' + response.error);
-                        alert(errorMessage);
-                        
-                        // Re-enable form
-                        if (submitBtn) submitBtn.disabled = false;
-                        if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-                        if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-                        if (cancelBtn) cancelBtn.disabled = false;
-                    } else {
-                        // Unexpected response format
-                        console.warn('Unexpected response format:', response);
-                        updateUploadStatusText('{% trans "Unexpected response from server" %}');
-                        alert('{% trans "Unexpected response from server. Please check the console for details." %}');
-                        if (submitBtn) submitBtn.disabled = false;
-                        if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-                        if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-                        if (cancelBtn) cancelBtn.disabled = false;
-                    }
-                } catch (e) {
-                    // Not JSON, might be HTML or redirect
-                    console.log('Response is not JSON, parsing as HTML. Error:', e);
-                    if (xhr.responseURL) {
-                        window.location.href = xhr.responseURL;
-                    } else {
-                        // Try to parse HTML for error messages
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(xhr.responseText, 'text/html');
-                        const errorElements = doc.querySelectorAll('.alert-danger, .error, .invalid-feedback, .non-field-errors');
-                        let errorText = '{% trans "An error occurred. Server returned HTML response." %}';
-                        if (errorElements.length > 0) {
-                            errorText += '\n\n' + Array.from(errorElements).map(el => el.textContent.trim()).filter(text => text.length > 0).join('\n');
-                        }
-                        updateUploadStatusText('{% trans "Upload failed" %}');
-                        alert(errorText + '\n\n[Full response logged to console]');
-                        console.error('HTML response:', xhr.responseText);
-                        if (submitBtn) submitBtn.disabled = false;
-                        if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-                        if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-                        if (cancelBtn) cancelBtn.disabled = false;
-                    }
-                }
-            } else if (xhr.status === 302) {
-                // Redirect response
-                const location = xhr.getResponseHeader('Location');
-                if (location) {
-                    window.location.href = location;
-                } else if (xhr.responseURL) {
-                    window.location.href = xhr.responseURL;
-                } else {
-                    window.location.href = window.location.href;
-                }
-            } else if (xhr.status === 413) {
-                // Request Entity Too Large - specific handling
-                let errorMessage = '{% trans "Upload failed: File is too large" %}';
-                let details = '';
-                
-                // Calculate total file size
-                const fileInput = document.getElementById('{{ form.files.id_for_label }}');
-                if (fileInput && fileInput.files) {
-                    let totalSize = 0;
-                    Array.from(fileInput.files).forEach(file => {
-                        totalSize += file.size;
-                    });
-                    const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-                    const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
-                    details = `\n\n{% trans "Total file size" %}: ${totalSizeGB} GB (${totalSizeMB} MB)`;
-                    details += `\n{% trans "Maximum allowed size" %}: ${MAX_DATASET_UPLOAD_SIZE_GB} GB`;
-                }
-                
-                errorMessage += details;
-                errorMessage += '\n\n{% trans "Please either:" %}';
-                errorMessage += '\n1. {% trans "Compress your files before uploading" %}';
-                errorMessage += '\n2. {% trans "Split into smaller files" %}';
-                errorMessage += '\n3. {% trans "Contact administrator if you need to upload larger files" %}';
-                
-                updateUploadStatusText('{% trans "Upload failed: File too large" %}');
-                alert(errorMessage);
-                console.error('413 Request Entity Too Large - File size limit exceeded');
-                console.error('Response:', xhr.responseText);
-                
-                // Re-enable form
-                if (submitBtn) submitBtn.disabled = false;
-                if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-                if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-                if (cancelBtn) cancelBtn.disabled = false;
-            } else if (xhr.status === 502 || xhr.status === 504) {
-                console.error(`${xhr.status} gateway error during upload`);
-                console.error('Response:', xhr.responseText);
-                showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
-            } else {
-                // HTTP error status
-                let errorMessage = `{% trans "Upload failed" %} (HTTP ${xhr.status} ${xhr.statusText})`;
-                
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    console.error('Error response:', response);
-                    if (response.error) {
-                        errorMessage = response.error;
-                    }
-                    if (response.errors) {
-                        errorMessage += '\n\nField errors:';
-                        for (const [field, errors] of Object.entries(response.errors)) {
-                            errorMessage += `\n- ${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`;
-                        }
-                    }
-                    if (response.error_details) {
-                        console.error('Error details:', response.error_details);
-                        errorMessage += '\n\n[Check browser console for full details]';
-                    }
-                } catch (e) {
-                    // Not JSON
-                    errorMessage += '\n\nResponse: ' + (xhr.responseText ? xhr.responseText.substring(0, 500) : '(empty)');
-                    console.error('Error response text:', xhr.responseText);
-                }
-                
-                updateUploadStatusText(errorMessage);
-                alert(errorMessage + '\n\n{% trans "Please check the browser console for more details." %}');
-                
-                // Re-enable form
-                if (submitBtn) submitBtn.disabled = false;
-                if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-                if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-                if (cancelBtn) cancelBtn.disabled = false;
-            }
+            handleUploadXhrResponse(xhr, submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
         });
-        
+
         xhr.addEventListener('error', () => {
             console.error('Network error during upload');
             console.error('Status:', xhr.status);
             console.error('Status text:', xhr.statusText);
             console.error('Response:', xhr.responseText);
             console.error('Ready state:', xhr.readyState);
-            
+
             if (xhr.readyState === 4) {
                 showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
                 return;
@@ -867,19 +985,14 @@ function handleFormSubmission() {
 
             updateUploadStatusText('{% trans "Network error during upload" %}');
             alert('{% trans "Network error during upload. Please check your connection and try again." %}\n\n{% trans "Check the browser console (F12) for more details." %}');
-            
             reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
         });
-        
+
         xhr.addEventListener('abort', () => {
             updateUploadStatusText('{% trans "Upload cancelled" %}');
-            // Re-enable form
-            if (submitBtn) submitBtn.disabled = false;
-            if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-            if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-            if (cancelBtn) cancelBtn.disabled = false;
+            reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
         });
-        
+
         updateUploadStatusText('{% trans "Starting upload..." %}');
         xhr.open('POST', form.action);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');

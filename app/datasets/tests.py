@@ -10,6 +10,7 @@ from django.utils.datastructures import MultiValueDict
 from unittest.mock import patch, MagicMock
 from datetime import timedelta
 from tempfile import TemporaryDirectory
+import json
 import uuid
 
 from .models import (
@@ -531,6 +532,143 @@ class DatasetVersionFormTests(TestCase):
         accept_attr = form.fields['files'].widget.attrs.get('accept', '')
         self.assertIn('.dta', accept_attr, '.dta should be in accept attribute')
         self.assertIn('.rds', accept_attr, '.rds should be in accept attribute')
+
+
+class DatasetVersionChunkUploadTests(TestCase):
+    """Tests for chunked dataset version uploads."""
+
+    def setUp(self):
+        self.temp_media = TemporaryDirectory()
+        self.override_media = override_settings(MEDIA_ROOT=self.temp_media.name)
+        self.override_media.enable()
+
+        self.user = User.objects.create_user(
+            username='chunkowner',
+            email='chunkowner@example.com',
+            password='testpass123',
+        )
+        self.other_user = User.objects.create_user(
+            username='chunkother',
+            email='chunkother@example.com',
+            password='testpass123',
+        )
+        self.dataset = Dataset.objects.create(
+            title='Chunk Dataset',
+            description='Dataset for chunk upload tests',
+            owner=self.user,
+        )
+        self.upload_id = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+        self.chunk_url = reverse(
+            'datasets:dataset_version_upload_chunk',
+            args=[self.dataset.pk],
+        )
+        self.create_url = reverse(
+            'datasets:dataset_version_create',
+            args=[self.dataset.pk],
+        )
+        self.client = Client()
+
+    def tearDown(self):
+        self.override_media.disable()
+        self.temp_media.cleanup()
+
+    def _post_chunk(self, user, file_index, chunk_index, total_chunks, filename, content):
+        self.client.force_login(user)
+        return self.client.post(
+            self.chunk_url,
+            {
+                'upload_id': self.upload_id,
+                'file_index': file_index,
+                'chunk_index': chunk_index,
+                'total_chunks': total_chunks,
+                'filename': filename,
+                'file': SimpleUploadedFile(filename, content),
+            },
+        )
+
+    def test_chunk_upload_and_create_version(self):
+        """Owner can upload chunks and create a version from assembled files."""
+        from .chunk_uploads import chunk_base_dir
+
+        content = b'hello chunk world'
+        mid = len(content) // 2
+
+        response1 = self._post_chunk(self.user, 0, 0, 2, 'data.txt', content[:mid])
+        self.assertEqual(response1.status_code, 200)
+        self.assertTrue(response1.json()['success'])
+
+        response2 = self._post_chunk(self.user, 0, 1, 2, 'data.txt', content[mid:])
+        self.assertEqual(response2.status_code, 200)
+        self.assertTrue(response2.json()['success'])
+
+        self.client.force_login(self.user)
+        response = self.client.post(
+            self.create_url,
+            {
+                'version_number': '2.0',
+                'description': 'Chunked upload',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+                'upload_id': self.upload_id,
+                'chunked_files': json.dumps([
+                    {
+                        'file_index': 0,
+                        'filename': 'data.txt',
+                        'file_size': len(content),
+                    },
+                ]),
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+
+        version = DatasetVersion.objects.get(dataset=self.dataset, version_number='2.0')
+        version_files = DatasetVersionFile.objects.filter(version=version)
+        self.assertEqual(version_files.count(), 1)
+        self.assertEqual(version_files.first().original_name, 'data.txt')
+        self.assertEqual(version_files.first().file_size, len(content))
+        self.assertFalse(chunk_base_dir(self.user.pk, self.upload_id).exists())
+
+    def test_chunk_upload_forbidden_for_non_contributor(self):
+        """Non-contributors cannot upload chunks."""
+        self.client.force_login(self.other_user)
+        response = self.client.post(
+            self.chunk_url,
+            {
+                'upload_id': self.upload_id,
+                'file_index': 0,
+                'chunk_index': 0,
+                'total_chunks': 1,
+                'filename': 'data.txt',
+                'file': SimpleUploadedFile('data.txt', b'data'),
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(response.json()['success'])
+
+    def test_chunk_upload_rejects_out_of_order_chunk(self):
+        """Chunks must arrive in sequential order."""
+        content = b'abcdefghij'
+        self._post_chunk(self.user, 0, 0, 2, 'data.txt', content[:5])
+
+        self.client.force_login(self.user)
+        response = self.client.post(
+            self.chunk_url,
+            {
+                'upload_id': self.upload_id,
+                'file_index': 0,
+                'chunk_index': 0,
+                'total_chunks': 2,
+                'filename': 'data.txt',
+                'file': SimpleUploadedFile('data.txt', content[5:]),
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Expected chunk', response.json()['error'])
 
 
 class DatasetModelTests(TestCase):

@@ -319,7 +319,8 @@ The application is configured to handle large file uploads up to 100GB:
 - **Gunicorn**: 3 workers, `--timeout 3600` (1 hour)
 - **Nginx timeouts**: Extended to 3600s (1 hour) for large uploads
 - **Proxy**: Buffering disabled for better performance
-- **Traefik**: `responseforwarding.flushinterval=100ms` on the nginx service; host `default@file` middleware timeouts must also allow long uploads
+- **Traefik**: `isr-longtimeout` middleware (`forwardingTimeouts` 3600s) prepended before host `default@file`; `responseforwarding.flushinterval=100ms` on the nginx service; host entrypoint timeouts must also allow long uploads
+- **Browser (large uploads)**: Totals over 32MB are sent as sequential 8MB chunks, then the version is created from assembled temp files
 
 ### Why production uses gunicorn/WSGI
 
@@ -392,11 +393,23 @@ docker compose -f docker-compose.prod.yml restart nginx
 | **Django Data** | 100GB | - | Configured |
 | **Django Memory Spill** | 10MB | - | Configured |
 | **Proxy Buffering** | Disabled | - | Optimized |
-| **Traefik (host)** | - | Must match | Check `default@file` middleware |
+| **Traefik (compose)** | - | 3600s forwarding | `isr-longtimeout` middleware |
+| **Traefik (host)** | - | Must match | Check `default@file` middleware + entrypoint |
 
 ### Traefik on the host
 
-The router uses `default@file` middleware (outside this repo). For uploads over several GB, ensure Traefik entrypoint / middleware `respondingTimeouts.readTimeout` and `idleTimeout` are at least **3600s**, and that no body-size limit blocks the request before it reaches nginx.
+The router uses middleware chain `isr-longtimeout,default@file`. Compose defines `isr-longtimeout` with 3600s forwarding timeouts; `default@file` is configured on the host (outside this repo).
+
+For uploads over several GB, ensure Traefik entrypoint `readTimeout` / `idleTimeout` are at least **3600s**, and that no body-size limit blocks the request before it reaches nginx. Chunked uploads (8MB per request for totals over 32MB) reduce dependence on single-request proxy timeouts, but entrypoint limits should still be raised for any remaining single-request uploads.
+
+**Compose labels** (`docker-compose.prod.yml`):
+
+```yaml
+traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.dialtimeout=30s
+traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.responseheadertimeout=3600s
+traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.idleconntimeout=3600s
+traefik.http.routers.dataplexity-isrdatasets.middlewares=isr-longtimeout,default@file
+```
 
 ### Troubleshooting Upload Issues
 
@@ -408,7 +421,7 @@ The router uses `default@file` middleware (outside this repo). For uploads over 
 
 2. **502 Bad Gateway / 504 Gateway Timeout**
    - **Cause**: App worker killed (often ASGI RAM buffering) or proxy timeout while waiting for Django to finish saving the file
-   - **Solution**: Use gunicorn/WSGI in production, confirm gunicorn and nginx timeouts are 3600s, raise Traefik `default@file` timeouts on the host
+   - **Solution**: Use gunicorn/WSGI in production, confirm gunicorn and nginx timeouts are 3600s, raise Traefik `default@file` and entrypoint timeouts on the host; for very large files the UI automatically uses 8MB chunked uploads when total size exceeds 32MB
 
 3. **500 Internal Server Error**
    - **Cause**: Django or disk space issues
