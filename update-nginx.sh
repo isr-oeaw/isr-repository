@@ -21,8 +21,8 @@ if ! docker info > /dev/null 2>&1; then
 fi
 
 echo "📋 Current nginx configuration changes:"
-echo "  ✅ client_max_body_size increased to 1G"
-echo "  ✅ Timeout settings increased to 300s"
+echo "  ✅ client_max_body_size increased to 100G"
+echo "  ✅ Timeout settings increased to 3600s"
 echo "  ✅ Proxy buffering disabled for large uploads"
 echo ""
 
@@ -72,6 +72,6 @@ echo ""
 echo "🎉 Nginx configuration update completed!"
 echo ""
 echo "📊 Upload limits now configured for:"
-echo "  ✅ Maximum file size: 1GB"
-echo "  ✅ Timeout: 5 minutes (300s)"
+echo "  ✅ Maximum file size: 100GB"
+echo "  ✅ Timeout: 1 hour (3600s)"
 echo "  ✅ Optimized for large file uploads"

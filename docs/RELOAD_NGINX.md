@@ -43,13 +43,13 @@ After reloading, verify the configuration:
 # Check nginx configuration is loaded
 docker compose exec nginx nginx -T | grep client_max_body_size
 
-# Should show: client_max_body_size 10G;
+# Should show: client_max_body_size 100G;
 ```
 
 ## Current Limits
 
-- **Nginx**: 10GB (`client_max_body_size 10G`)
-- **Django**: 1GB (`FILE_UPLOAD_MAX_MEMORY_SIZE`)
-- **Timeout**: 300 seconds (5 minutes)
+- **Nginx**: 100GB (`client_max_body_size 100G`)
+- **Django**: 100GB (`DATA_UPLOAD_MAX_MEMORY_SIZE` / `MAX_DATASET_UPLOAD_SIZE`)
+- **Timeout**: 3600 seconds (1 hour)
 
-Note: The Django limit is for in-memory uploads. Files larger than this will be written to disk automatically.
+Note: Files larger than `FILE_UPLOAD_MAX_MEMORY_SIZE` (10MB) are written to disk automatically during upload.

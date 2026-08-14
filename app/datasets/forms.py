@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from .models import Dataset, DatasetCategory, DatasetVersion, Comment, Publisher, DatasetAnalysis
@@ -285,7 +286,13 @@ class DatasetVersionForm(forms.ModelForm):
         # Add help text for fields
         self.fields['version_number'].help_text = 'Use semantic versioning (e.g., 1.0, 1.1, 2.0)'
         self.fields['description'].help_text = 'Optional: Describe what changed in this version'
-        self.fields['files'].help_text = 'Upload one or more files for this version (CSV, SPSS (.sav, .zsav, .por), Stata (.dta), R (.rds), JSON, Excel, TXT, ZIP, TAR.GZ, GPKG, Shapefile, GeoJSON, KML/KMZ, Raster formats, File/Personal Geodatabase, Esri Layer Files, Esri Map Packages, QGIS Project Files, QML, SpatiaLite, SQL, PDF formats supported, max 1GB per file)'
+        max_upload_gb = settings.MAX_DATASET_UPLOAD_SIZE // (1024 * 1024 * 1024)
+        self.fields['files'].help_text = (
+            'Upload one or more files for this version (CSV, SPSS (.sav, .zsav, .por), Stata (.dta), R (.rds), '
+            'JSON, Excel, TXT, ZIP, TAR.GZ, GPKG, Shapefile, GeoJSON, KML/KMZ, Raster formats, File/Personal '
+            f'Geodatabase, Esri Layer Files, Esri Map Packages, QGIS Project Files, QML, SpatiaLite, SQL, PDF '
+            f'formats supported, max {max_upload_gb}GB total)'
+        )
         self.fields['file_url'].help_text = 'External URL where the file can be accessed'
         self.fields['file_url_description'].help_text = 'Optional: Describe where the file is located'
         self.fields['file_size_text'].help_text = 'Human-readable file size (e.g., "2.5 MB", "1.2 GB")'
@@ -325,14 +332,28 @@ class DatasetVersionForm(forms.ModelForm):
             if file_size_text:
                 raise forms.ValidationError('File size will be calculated automatically when uploading.')
             
+            max_upload_size = settings.MAX_DATASET_UPLOAD_SIZE
+            max_upload_gb = max_upload_size // (1024 * 1024 * 1024)
+
             for upload in uploaded_files:
-                max_file_size = 10 * 1024 * 1024 * 1024  # 10GB
-                if upload.size > max_file_size:
+                if upload.size > max_upload_size:
                     size_gb = upload.size / (1024 * 1024 * 1024)
-                    self.add_error('files', f'File "{upload.name}" ({size_gb:.2f} GB) exceeds the 10GB size limit.')
-                    raise forms.ValidationError('Each uploaded file must be 10GB or smaller.')
+                    self.add_error(
+                        'files',
+                        f'File "{upload.name}" ({size_gb:.2f} GB) exceeds the {max_upload_gb}GB size limit.',
+                    )
+                    raise forms.ValidationError(f'Each uploaded file must be {max_upload_gb}GB or smaller.')
+
                 total_upload_size += upload.size
-            
+
+            if total_upload_size > max_upload_size:
+                total_gb = total_upload_size / (1024 * 1024 * 1024)
+                self.add_error(
+                    'files',
+                    f'Total upload size ({total_gb:.2f} GB) exceeds the {max_upload_gb}GB limit.',
+                )
+                raise forms.ValidationError(f'Total upload size must be {max_upload_gb}GB or smaller.')
+
             # Update file_size field with total upload size
             self.instance.file_size = total_upload_size
             

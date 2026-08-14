@@ -560,8 +560,11 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
+        from django.conf import settings
+
         context = super().get_context_data(**kwargs)
         context['dataset'] = self.dataset
+        context['max_dataset_upload_size'] = settings.MAX_DATASET_UPLOAD_SIZE
         return context
 
 

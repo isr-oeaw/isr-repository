@@ -279,7 +279,7 @@
                         </li>
                         <li class="mb-2">
                             <i class="bi bi-info-circle text-info me-2"></i>
-                            {% trans "Maximum file size: 10GB per upload (supported formats: CSV, JSON, Excel, TXT, ZIP, TAR.GZ, GPKG, Shapefile, GeoJSON, KML/KMZ, Raster formats, File/Personal Geodatabase, Esri Layer Files, Esri Map Packages, QGIS Project Files, QML, SpatiaLite, SQL, SPSS, Stata, R)" %}
+                            {% trans "Maximum total upload size: 100GB (supported formats: CSV, JSON, Excel, TXT, ZIP, TAR.GZ, GPKG, Shapefile, GeoJSON, KML/KMZ, Raster formats, File/Personal Geodatabase, Esri Layer Files, Esri Map Packages, QGIS Project Files, QML, SpatiaLite, SQL, SPSS, Stata, R)" %}
                         </li>
                         <li>
                             <i class="bi bi-check-circle text-success me-2"></i>
@@ -297,6 +297,45 @@
 let uploadedFiles = [];
 let isUploading = false;
 let uploadPromises = [];
+const MAX_DATASET_UPLOAD_SIZE = {{ max_dataset_upload_size }};
+const MAX_DATASET_UPLOAD_SIZE_GB = Math.round(MAX_DATASET_UPLOAD_SIZE / (1024 * 1024 * 1024));
+
+function validateUploadSize(files) {
+    const fileList = Array.from(files || []);
+    let totalSize = 0;
+    const oversizedFiles = [];
+
+    fileList.forEach(file => {
+        totalSize += file.size;
+        if (file.size > MAX_DATASET_UPLOAD_SIZE) {
+            oversizedFiles.push(file);
+        }
+    });
+
+    if (oversizedFiles.length > 0) {
+        const fileDetails = oversizedFiles
+            .map(file => `- ${file.name}: ${formatFileSize(file.size)}`)
+            .join('\n');
+        return {
+            valid: false,
+            message: `{% trans "The following file(s) exceed the maximum allowed size of" %} ${MAX_DATASET_UPLOAD_SIZE_GB} GB:\n\n${fileDetails}`
+        };
+    }
+
+    if (totalSize > MAX_DATASET_UPLOAD_SIZE) {
+        const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
+        return {
+            valid: false,
+            message: `{% trans "Total upload size" %}: ${totalSizeGB} GB (${formatFileSize(totalSize)})\n{% trans "Maximum allowed size" %}: ${MAX_DATASET_UPLOAD_SIZE_GB} GB`
+        };
+    }
+
+    return { valid: true };
+}
+
+function showUploadSizeError(message) {
+    alert(message + '\n\n{% trans "Please either:" %}\n1. {% trans "Compress your files before uploading" %}\n2. {% trans "Split into smaller files" %}\n3. {% trans "Contact administrator if you need to upload larger files" %}');
+}
 
 function toggleFileInput() {
     const uploadRadio = document.getElementById('input_method_upload');
@@ -492,6 +531,16 @@ function handleFileSelection() {
             hideUploadProgress();
             return;
         }
+
+        const sizeCheck = validateUploadSize(files);
+        if (!sizeCheck.valid) {
+            e.target.value = '';
+            uploadedFiles = [];
+            uploadPromises = [];
+            hideUploadProgress();
+            showUploadSizeError(sizeCheck.message);
+            return;
+        }
         
         // Clear previous uploads
         uploadedFiles = [];
@@ -558,6 +607,12 @@ function handleFormSubmission() {
         if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
             // No files selected, submit normally (validation will catch this)
             form.submit();
+            return;
+        }
+
+        const sizeCheck = validateUploadSize(fileInput.files);
+        if (!sizeCheck.valid) {
+            showUploadSizeError(sizeCheck.message);
             return;
         }
         
@@ -720,7 +775,7 @@ function handleFormSubmission() {
                     const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
                     const totalSizeGB = (totalSize / (1024 * 1024 * 1024)).toFixed(2);
                     details = `\n\n{% trans "Total file size" %}: ${totalSizeGB} GB (${totalSizeMB} MB)`;
-                    details += `\n{% trans "Maximum allowed size" %}: 10 GB`;
+                    details += `\n{% trans "Maximum allowed size" %}: ${MAX_DATASET_UPLOAD_SIZE_GB} GB`;
                 }
                 
                 errorMessage += details;
