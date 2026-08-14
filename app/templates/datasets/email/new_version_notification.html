@@ -1,108 +1,92 @@
 {% extends "account/email/base_message.html" %}
 {% load i18n %}
 
+{% block header_bg %}#001A70{% endblock %}
+{% block accent_color %}#92C1E9{% endblock %}
+{% block heading_color %}#001A70{% endblock %}
+{% block link_color %}#001A70{% endblock %}
+
 {% block title %}{% trans "New Dataset Version Available" %} - {{ site_name }}{% endblock %}
 
 {% block header %}
-<h1>{% trans "New Version Available" %}</h1>
+<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "New Version Available" %}</h1>
+{% endblock %}
+
+{% block header_accent %}
+<tr>
+    <td style="background-color: #92C1E9; height: 6px; font-size: 0; line-height: 0;">&nbsp;</td>
+</tr>
 {% endblock %}
 
 {% block content %}
-<style>
-    .dataset-card {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
-    }
-    .version-info {
-        background-color: #d4edda;
-        border-left: 4px solid #28a745;
-        padding: 15px;
-        margin: 20px 0;
-        border-radius: 4px;
-    }
-    .dataset-link {
-        display: inline-block;
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        color: white;
-        text-decoration: none;
-        padding: 12px 30px;
-        border-radius: 6px;
-        font-weight: 600;
-        margin: 20px 0;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .dataset-link:hover {
-        background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
-    }
-    .file-info {
-        background-color: #e9ecef;
-        border-radius: 4px;
-        padding: 10px;
-        margin: 10px 0;
-        font-family: monospace;
-        font-size: 14px;
-    }
-</style>
+<p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
 
-<p>{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
+<p style="margin: 0 0 24px 0;">{% blocktrans with dataset_title=dataset.title version=version.version_number %}A new version ({{ version }}) of the dataset "{{ dataset_title }}" is now available.{% endblocktrans %}</p>
 
-<p>{% blocktrans with dataset_title=dataset.title version=version.version_number %}A new version ({{ version }}) of the dataset "{{ dataset_title }}" is now available.{% endblocktrans %}</p>
-
-<div class="dataset-card">
-    <h3 style="margin-top: 0; color: #007bff;">{{ dataset.title }}</h3>
-    <p style="margin-bottom: 0; color: #6c757d;">{{ dataset.description|truncatechars:150 }}</p>
-    <div style="margin-top: 10px;">
-        <span class="badge" style="background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#000{% else %}#fff{% endif %};">
+<div class="card" style="border-left: 4px solid #92C1E9;">
+    <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #001A70;">{{ dataset.title }}</h3>
+    <p class="meta" style="margin: 0 0 12px 0;">{{ dataset.description|truncatechars:150 }}</p>
+    <p style="margin: 0;">
+        <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#1A1A1A{% else %}#FFFFFF{% endif %}; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin-right: 8px;">
             {{ dataset.category.name }}
         </span>
-        <span class="badge {% if dataset.status == 'published' %}bg-success{% elif dataset.status == 'draft' %}bg-warning{% else %}bg-secondary{% endif %}">
+        <span style="display: inline-block; background-color: #555555; color: #FFFFFF; padding: 4px 10px; border-radius: 4px; font-size: 13px;">
             {{ dataset.get_status_display }}
         </span>
-    </div>
+    </p>
 </div>
 
-<div class="version-info">
-    <strong>{% trans "New Version Details:" %}</strong>
-    <div style="margin-top: 10px;">
-        <div><strong>{% trans "Version:" %}</strong> {{ version.version_number }}</div>
-        <div><strong>{% trans "Released:" %}</strong> {{ version.created_at|date:"F d, Y \a\t g:i A" }}</div>
+<div class="info-box" style="border-left-color: #92C1E9; background-color: #E8F0FA;">
+    <strong style="color: #001A70;">{% trans "New Version Details:" %}</strong>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top: 12px; width: 100%;">
+        <tr>
+            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Version:" %}</strong></td>
+            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.version_number }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Released:" %}</strong></td>
+            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.created_at|date:"F d, Y \a\t g:i A" }}</td>
+        </tr>
         {% if version.description %}
-        <div><strong>{% trans "Changes:" %}</strong> {{ version.description|truncatechars:200 }}</div>
+        <tr>
+            <td valign="top" style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Changes:" %}</strong></td>
+            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.description|truncatechars:200 }}</td>
+        </tr>
         {% endif %}
-        {% if version.file %}
-        <div class="file-info">
-            <strong>{% trans "File:" %}</strong> {{ version.file.name|slice:"-50:" }}<br>
-            <strong>{% trans "Size:" %}</strong> {{ version.get_file_size_display }}
-        </div>
-        {% endif %}
+    </table>
+    {% if version.file %}
+    <div style="background-color: #F4F4F4; border-radius: 4px; padding: 12px; margin-top: 12px; font-family: monospace; font-size: 14px; color: #555555;">
+        <strong style="color: #1A1A1A;">{% trans "File:" %}</strong> {{ version.file.name|slice:"-50:" }}<br>
+        <strong style="color: #1A1A1A;">{% trans "Size:" %}</strong> {{ version.get_file_size_display }}
     </div>
+    {% endif %}
 </div>
 
-<div style="text-align: center;">
-    <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="dataset-link">
-        {% trans "View Dataset and Download New Version" %}
-    </a>
-</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 8px 0 24px 0;">
+            <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #001A70; color: #FFFFFF;">
+                {% trans "View Dataset and Download New Version" %}
+            </a>
+        </td>
+    </tr>
+</table>
 
-<div style="background-color: #e9ecef; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px;">
-    <strong>{% trans "Quick Actions:" %}</strong>
-    <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+<div class="info-box" style="border-left-color: #92C1E9;">
+    <strong style="color: #1A1A1A;">{% trans "Quick Actions:" %}</strong>
+    <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555555;">
         <li>{% trans "Download the new version of the dataset" %}</li>
         <li>{% trans "Review the changes and updates" %}</li>
         <li>{% trans "Update your research with the latest data" %}</li>
     </ul>
 </div>
 
-<p>{% trans "Thank you for following this dataset!" %}</p>
+<p style="margin: 24px 0 0 0;">{% trans "Thank you for following this dataset!" %}</p>
 
 {% if not user.notify_new_versions %}
-<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 20px 0; color: #856404;">
-    <strong>{% trans "Email Notifications:" %}</strong>
-    <p style="margin: 5px 0 0 0;">{% trans "You can manage your email notification preferences in your account settings." %}</p>
+<div class="notice">
+    <strong style="color: #1A1A1A;">{% trans "Email Notifications:" %}</strong>
+    <p style="margin: 8px 0 0 0;">{% trans "You can manage your email notification preferences in your account settings." %}</p>
 </div>
 {% endif %}
 {% endblock content %}
