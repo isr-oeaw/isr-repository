@@ -1,108 +1,85 @@
 {% extends "account/email/base_message.html" %}
 {% load i18n %}
 
+{% block header_bg %}#001A70{% endblock %}
+{% block accent_color %}#92C1E9{% endblock %}
+{% block heading_color %}#001A70{% endblock %}
+{% block link_color %}#001A70{% endblock %}
+
 {% block title %}{% trans "New Comment on Your Dataset" %} - {{ site_name }}{% endblock %}
 
 {% block header %}
-<h1>{% trans "New Comment on Your Dataset" %}</h1>
+<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "New Comment on Your Dataset" %}</h1>
+{% endblock %}
+
+{% block header_accent %}
+<tr>
+    <td style="background-color: #92C1E9; height: 6px; font-size: 0; line-height: 0;">&nbsp;</td>
+</tr>
 {% endblock %}
 
 {% block content %}
-<style>
-    .dataset-card {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
-    }
-    .comment-card {
-        background-color: #ffffff;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 20px;
-        margin: 20px 0;
-        border-left: 4px solid #007bff;
-    }
-    .user-info {
-        display: flex;
-        align-items: center;
-        margin-bottom: 15px;
-    }
-    .user-avatar {
-        width: 40px;
-        height: 40px;
-        background-color: #007bff;
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 15px;
-        font-weight: bold;
-    }
-    .dataset-link {
-        display: inline-block;
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        color: white;
-        text-decoration: none;
-        padding: 12px 30px;
-        border-radius: 6px;
-        font-weight: 600;
-        margin: 20px 0;
-        text-align: center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .dataset-link:hover {
-        background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
-    }
-</style>
+<p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if owner.first_name %}, {{ owner.first_name }}{% endif %},</p>
 
-<p>{% trans "Hello" %}{% if owner.first_name %}, {{ owner.first_name }}{% endif %},</p>
+<p style="margin: 0 0 24px 0;">{% blocktrans with commenter=commenter.get_full_name|default:commenter.username %}You have received a new comment on your dataset from {{ commenter }}.{% endblocktrans %}</p>
 
-<p>{% blocktrans with commenter=commenter.get_full_name|default:commenter.username %}You have received a new comment on your dataset from {{ commenter }}.{% endblocktrans %}</p>
-
-<div class="dataset-card">
-    <h3 style="margin-top: 0; color: #007bff;">{{ dataset.title }}</h3>
-    <p style="margin-bottom: 0; color: #6c757d;">{{ dataset.description|truncatechars:150 }}</p>
+<div class="card" style="border-left: 4px solid #92C1E9;">
+    <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #001A70;">{{ dataset.title }}</h3>
+    <p class="meta" style="margin: 0;">{{ dataset.description|truncatechars:150 }}</p>
 </div>
 
-<div class="comment-card">
-    <div class="user-info">
-        <div class="user-avatar">
-            {{ commenter.get_full_name|default:commenter.username|first|upper }}
-        </div>
-        <div>
-            <strong>{{ commenter.get_full_name|default:commenter.username }}</strong><br>
-            <small style="color: #6c757d;">{{ comment.created_at|date:"F d, Y \a\t g:i A" }}</small>
-        </div>
-    </div>
-    <div style="font-style: italic; color: #495057;">
-        "{{ comment.content|truncatechars:200 }}{% if comment.content|length > 200 %}...{% endif %}"
-    </div>
-</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 20px 0; background-color: #FFFFFF; border: 1px solid #D6E4F5; border-left: 4px solid #92C1E9; border-radius: 0 4px 4px 0;">
+    <tr>
+        <td style="padding: 20px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                    <td valign="top" style="padding-right: 16px;">
+                        <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                                <td width="40" height="40" align="center" valign="middle" style="width: 40px; height: 40px; background-color: #001A70; color: #FFFFFF; font-weight: 700; font-size: 16px; border-radius: 4px;">
+                                    {{ commenter.get_full_name|default:commenter.username|first|upper }}
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td valign="top">
+                        <strong style="color: #1A1A1A;">{{ commenter.get_full_name|default:commenter.username }}</strong><br>
+                        <span class="meta">{{ comment.created_at|date:"F d, Y \a\t g:i A" }}</span>
+                    </td>
+                </tr>
+            </table>
+            <p style="margin: 16px 0 0 0; font-style: italic; color: #555555;">
+                &ldquo;{{ comment.content|truncatechars:200 }}{% if comment.content|length > 200 %}&hellip;{% endif %}&rdquo;
+            </p>
+        </td>
+    </tr>
+</table>
 
-<div style="text-align: center;">
-    <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="dataset-link">
-        {% trans "View Dataset and Comment" %}
-    </a>
-</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 8px 0 24px 0;">
+            <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #001A70; color: #FFFFFF;">
+                {% trans "View Dataset and Comment" %}
+            </a>
+        </td>
+    </tr>
+</table>
 
-<div style="background-color: #e9ecef; border-left: 4px solid #007bff; padding: 15px; margin: 20px 0; border-radius: 4px;">
-    <strong>{% trans "Quick Actions:" %}</strong>
-    <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+<div class="info-box" style="border-left-color: #92C1E9;">
+    <strong style="color: #1A1A1A;">{% trans "Quick Actions:" %}</strong>
+    <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555555;">
         <li>{% trans "Reply to the comment directly on the dataset page" %}</li>
         <li>{% trans "Share your dataset with others" %}</li>
         <li>{% trans "Update your dataset information if needed" %}</li>
     </ul>
 </div>
 
-<p>{% trans "Thank you for sharing your dataset with the community!" %}</p>
+<p style="margin: 24px 0 0 0;">{% trans "Thank you for sharing your dataset with the community!" %}</p>
 
 {% if not owner.email_notifications %}
-<div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 20px 0; color: #856404;">
-    <strong>{% trans "Email Notifications:" %}</strong>
-    <p style="margin: 5px 0 0 0;">{% trans "You can manage your email notification preferences in your account settings." %}</p>
+<div class="notice">
+    <strong style="color: #1A1A1A;">{% trans "Email Notifications:" %}</strong>
+    <p style="margin: 8px 0 0 0;">{% trans "You can manage your email notification preferences in your account settings." %}</p>
 </div>
 {% endif %}
 {% endblock content %}
