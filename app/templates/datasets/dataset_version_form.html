@@ -337,6 +337,24 @@ function showUploadSizeError(message) {
     alert(message + '\n\n{% trans "Please either:" %}\n1. {% trans "Compress your files before uploading" %}\n2. {% trans "Split into smaller files" %}\n3. {% trans "Contact administrator if you need to upload larger files" %}');
 }
 
+function getServerTimeoutUploadMessage() {
+    return '{% trans "Upload failed: The file was sent to the server but processing did not complete in time. This often happens with very large files when a proxy or application timeout is too low." %}\n\n{% trans "Please try again. If the problem persists, contact your administrator." %}';
+}
+
+function reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn) {
+    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
+    if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
+    if (cancelBtn) cancelBtn.disabled = false;
+}
+
+function showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn) {
+    const errorMessage = getServerTimeoutUploadMessage();
+    updateUploadStatusText('{% trans "Upload failed: Server timeout" %}');
+    alert(errorMessage + '\n\n{% trans "Check the browser console (F12) for more details." %}');
+    reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+}
+
 function toggleFileInput() {
     const uploadRadio = document.getElementById('input_method_upload');
     const urlRadio = document.getElementById('input_method_url');
@@ -794,6 +812,10 @@ function handleFormSubmission() {
                 if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
                 if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
                 if (cancelBtn) cancelBtn.disabled = false;
+            } else if (xhr.status === 502 || xhr.status === 504) {
+                console.error(`${xhr.status} gateway error during upload`);
+                console.error('Response:', xhr.responseText);
+                showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
             } else {
                 // HTTP error status
                 let errorMessage = `{% trans "Upload failed" %} (HTTP ${xhr.status} ${xhr.statusText})`;
@@ -838,14 +860,15 @@ function handleFormSubmission() {
             console.error('Response:', xhr.responseText);
             console.error('Ready state:', xhr.readyState);
             
+            if (xhr.readyState === 4) {
+                showServerTimeoutUploadError(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
+                return;
+            }
+
             updateUploadStatusText('{% trans "Network error during upload" %}');
             alert('{% trans "Network error during upload. Please check your connection and try again." %}\n\n{% trans "Check the browser console (F12) for more details." %}');
             
-            // Re-enable form
-            if (submitBtn) submitBtn.disabled = false;
-            if (submitBtnText) submitBtnText.textContent = '{% trans "Create Version" %}';
-            if (submitBtnSpinner) submitBtnSpinner.style.display = 'none';
-            if (cancelBtn) cancelBtn.disabled = false;
+            reEnableUploadForm(submitBtn, submitBtnText, submitBtnSpinner, cancelBtn);
         });
         
         xhr.addEventListener('abort', () => {
