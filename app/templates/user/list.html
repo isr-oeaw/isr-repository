@@ -40,7 +40,6 @@
             class="table">
         <thead class="table-light">
             <tr>
-            <th data-field="id" data-sortable="true">{% trans "ID" %}</th>
             <th data-field="username" data-sortable="true">{% trans "Username" %}</th>
             <th data-field="email" data-sortable="true">{% trans "Email" %}</th>
             <th data-field="role" data-sortable="true">{% trans "Role" %}</th>
@@ -55,7 +54,6 @@
         <tbody>
             {% for user in users %}
             <tr>
-                <td>{{ user.id }}</td>
                 <td>{{ user.username }}</td>
                 <td>{{ user.email }}</td>
                 <td>
@@ -109,12 +107,33 @@
                 <td>{{ user.is_superuser|yesno:"Yes,No" }}</td>
                 <td>{{ user.date_joined|naturaltime }}</td>
                 <td class="text-end">
-                <a href="{% url 'user-profile-detail' user.id %}" class="btn btn-info btn-sm me-1" title="{% trans 'View Profile' %}">
-                    <i class="bi bi-person"></i> <span class="d-none d-sm-inline">{% trans "Profile" %}</span>
-                </a>
-                <a href="{% url 'user-edit' user.id %}" class="btn btn-secondary btn-sm" title="{% trans 'Edit' %}">
-                    <i class="bi bi-pencil-square"></i> <span class="d-none d-sm-inline">{% trans "Edit" %}</span>
-                </a>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            {% trans "Actions" %}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a href="{% url 'user-profile-detail' user.id %}" class="dropdown-item">
+                                    <i class="bi bi-person me-2"></i>{% trans "Profile" %}
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'user-edit' user.id %}" class="dropdown-item">
+                                    <i class="bi bi-pencil-square me-2"></i>{% trans "Edit" %}
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'user-set-password' user.id %}" class="dropdown-item">
+                                    <i class="bi bi-key me-2"></i>{% trans "Set Password" %}
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{% url 'user-disable-notifications' user.id %}" class="dropdown-item">
+                                    <i class="bi bi-bell-slash me-2"></i>{% trans "Disable Notifications" %}
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

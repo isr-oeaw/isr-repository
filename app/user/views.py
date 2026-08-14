@@ -1,6 +1,6 @@
 import datetime
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, DeleteView, TemplateView, UpdateView, ListView
+from django.views.generic import CreateView, DeleteView, TemplateView, UpdateView, ListView, FormView
 from django.views.generic.list import ListView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -17,10 +17,22 @@ from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
-from .forms import CustomUserCreationForm, CustomUserEditForm, RoleForm, RoleFilterForm, UserSettingsForm, UserNotificationForm, UserProfileForm, DataExportForm, APIKeyCreateForm, APIKeyRevokeForm
+from .forms import (
+    CustomUserCreationForm, CustomUserEditForm, RoleForm, RoleFilterForm, UserSettingsForm,
+    UserNotificationForm, UserProfileForm, DataExportForm, APIKeyCreateForm, APIKeyRevokeForm,
+    AdminSetPasswordForm,
+)
 from .models import Role, APIKey
 
 CustomUser = get_user_model()
+
+
+def _can_manage_user_list(user):
+    """Check if user can access the user list and related admin actions."""
+    return (
+        user.is_superuser or
+        (user.role and user.role.name == 'Administrator')
+    )
 
 
 def is_superuser_or_has_permission(permission):
@@ -424,6 +436,67 @@ class UsersUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             return self.form_invalid(form)
         
         return super().form_valid(form)
+
+
+class UserSetPasswordView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    """Allow administrators to set a new password for another user."""
+    form_class = AdminSetPasswordForm
+    template_name = 'user/set_password.html'
+
+    def test_func(self):
+        return _can_manage_user_list(self.request.user)
+
+    def dispatch(self, request, *args, **kwargs):
+        self.target_user = get_object_or_404(CustomUser, pk=kwargs['user_id'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.target_user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['target_user'] = self.target_user
+        return context
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(
+            self.request,
+            _('Password for user %(username)s has been updated successfully.') % {
+                'username': self.target_user.username,
+            },
+        )
+        return redirect('user-list')
+
+
+@login_required
+@user_passes_test(_can_manage_user_list)
+def disable_user_notifications(request, user_id):
+    """Disable all email notification preferences for a user."""
+    target_user = get_object_or_404(CustomUser, id=user_id)
+
+    if request.method == 'POST':
+        target_user.notify_dataset_updates = False
+        target_user.notify_new_versions = False
+        target_user.notify_comments = False
+        target_user.email_notifications = False
+        target_user.save(update_fields=[
+            'notify_dataset_updates',
+            'notify_new_versions',
+            'notify_comments',
+            'email_notifications',
+        ])
+        messages.success(
+            request,
+            _('All email notifications have been disabled for user %(username)s.') % {
+                'username': target_user.username,
+            },
+        )
+        return redirect('user-list')
+
+    return render(request, 'user/disable_notifications_confirm.html', {'user': target_user})
 
 
 class UsersListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
