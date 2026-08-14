@@ -1169,6 +1169,84 @@ class UserViewTests(TestCase):
         self.assertTemplateUsed(response, 'user/list.html')
         self.assertContains(response, 'testuser')
         self.assertContains(response, 'admin')
+
+    def test_user_list_does_not_show_id_column(self):
+        """Test that the user list does not display an ID column"""
+        self.client.login(username='admin', password='adminpass123')
+        response = self.client.get(reverse('user-list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'data-field="id"')
+        self.assertContains(response, 'testuser')
+
+    def test_user_set_password_requires_permission(self):
+        """Test that setting another user's password requires admin access"""
+        self.client.login(username='testuser', password='testpass123')
+        response = self.client.get(reverse('user-set-password', kwargs={'user_id': self.admin_user.pk}))
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post(
+            reverse('user-set-password', kwargs={'user_id': self.admin_user.pk}),
+            {'new_password1': 'newcomplexpass123', 'new_password2': 'newcomplexpass123'},
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_user_set_password_admin_can_change_password(self):
+        """Test that admin can set another user's password"""
+        self.client.login(username='admin', password='adminpass123')
+        response = self.client.get(reverse('user-set-password', kwargs={'user_id': self.user.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'user/set_password.html')
+
+        response = self.client.post(
+            reverse('user-set-password', kwargs={'user_id': self.user.pk}),
+            {'new_password1': 'newcomplexpass123', 'new_password2': 'newcomplexpass123'},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('user-list'))
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('newcomplexpass123'))
+        self.assertFalse(self.user.check_password('testpass123'))
+
+    def test_disable_notifications_requires_permission(self):
+        """Test that disabling notifications requires admin access"""
+        self.client.login(username='testuser', password='testpass123')
+        response = self.client.get(
+            reverse('user-disable-notifications', kwargs={'user_id': self.admin_user.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post(
+            reverse('user-disable-notifications', kwargs={'user_id': self.admin_user.pk})
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_disable_notifications_admin_post(self):
+        """Test that admin can disable all notification preferences for a user"""
+        self.user.notify_dataset_updates = True
+        self.user.notify_new_versions = True
+        self.user.notify_comments = True
+        self.user.email_notifications = True
+        self.user.save()
+
+        self.client.login(username='admin', password='adminpass123')
+        response = self.client.get(
+            reverse('user-disable-notifications', kwargs={'user_id': self.user.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'user/disable_notifications_confirm.html')
+
+        response = self.client.post(
+            reverse('user-disable-notifications', kwargs={'user_id': self.user.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('user-list'))
+
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.notify_dataset_updates)
+        self.assertFalse(self.user.notify_new_versions)
+        self.assertFalse(self.user.notify_comments)
+        self.assertFalse(self.user.email_notifications)
     
     def test_user_create_view_requires_permission(self):
         """Test that user create view requires admin permission"""

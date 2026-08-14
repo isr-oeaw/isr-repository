@@ -1,0 +1,78 @@
+{% extends "_base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Disable Notifications" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0">
+                        <i class="bi bi-bell-slash me-2"></i>
+                        {% trans "Disable Notifications" %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        {% blocktrans with username=user.username %}
+                        This will turn off all email notifications for <strong>{{ username }}</strong>.
+                        {% endblocktrans %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>{% trans "User Details" %}</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>{% trans "Username" %}:</strong></td>
+                                    <td>{{ user.username }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{% trans "Email" %}:</strong></td>
+                                    <td>{{ user.email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{% trans "Role" %}:</strong></td>
+                                    <td>
+                                        {% if user.role %}
+                                            <span class="badge bg-secondary">{{ user.role.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">{% trans "No role assigned" %}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>{% trans "Notifications to disable" %}</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-bell-slash text-warning me-2"></i>{% trans "Dataset updates" %}</li>
+                                <li><i class="bi bi-bell-slash text-warning me-2"></i>{% trans "New versions" %}</li>
+                                <li><i class="bi bi-bell-slash text-warning me-2"></i>{% trans "Comments" %}</li>
+                                <li><i class="bi bi-bell-slash text-warning me-2"></i>{% trans "Legacy email notifications" %}</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'user-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>
+                                {% trans "Cancel" %}
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-bell-slash me-2"></i>
+                                {% trans "Disable All Notifications" %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

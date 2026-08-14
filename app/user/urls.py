@@ -1,10 +1,11 @@
 from django.urls import path, include
 
 from user.views import (
-    AccountDeleteView, SettingsView, SignupPageView, 
-    UsersUpdateView, UsersListView, UserCreateView, RoleListView, RoleCreateView, 
+    AccountDeleteView, SettingsView, SignupPageView,
+    UsersUpdateView, UsersListView, UserCreateView, RoleListView, RoleCreateView,
     RoleUpdateView, RoleDeleteView, user_management_view, data_export_view,
-    PendingUsersView, approve_user, reject_user, UserProfileView, resend_email_verification
+    PendingUsersView, approve_user, reject_user, UserProfileView, resend_email_verification,
+    UserSetPasswordView, disable_user_notifications,
 )
 
 
@@ -19,6 +20,8 @@ urlpatterns = [
     path('list/', UsersListView.as_view(), name='user-list'),
     path('create/', UserCreateView.as_view(), name='user-create'),
     path('edit/<int:user_id>/', UsersUpdateView.as_view(), name='user-edit'),
+    path('edit/<int:user_id>/password/', UserSetPasswordView.as_view(), name='user-set-password'),
+    path('edit/<int:user_id>/disable-notifications/', disable_user_notifications, name='user-disable-notifications'),
     
     # User Approval
     path('pending/', PendingUsersView.as_view(), name='pending-users'),
