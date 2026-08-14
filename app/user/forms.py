@@ -33,6 +33,51 @@ class CustomUserCreationForm(UserCreationForm):
         return user
 
 
+class AdminUserCreateForm(forms.ModelForm):
+    """Passwordless form for administrators creating user accounts."""
+
+    role = forms.ModelChoiceField(
+        queryset=Role.objects.filter(is_active=True),
+        required=False,
+        empty_label="No role assigned",
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ('username', 'email', 'first_name', 'last_name', 'role')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].required = True
+        for field_name, field in self.fields.items():
+            if field_name == 'role':
+                field.widget.attrs.update({'class': 'form-select'})
+            else:
+                field.widget.attrs.update({'class': 'form-control'})
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_unusable_password()
+        user.is_approved = True
+        if commit:
+            user.save()
+            self._ensure_verified_email_address(user)
+        return user
+
+    def _ensure_verified_email_address(self, user):
+        from allauth.account.models import EmailAddress
+
+        email_address, created = EmailAddress.objects.get_or_create(
+            user=user,
+            email=user.email,
+            defaults={'verified': True, 'primary': True},
+        )
+        if not created:
+            email_address.verified = True
+            email_address.primary = True
+            email_address.save(update_fields=['verified', 'primary'])
+
+
 class CustomUserEditForm(UserChangeForm):
     role = forms.ModelChoiceField(
         queryset=Role.objects.filter(is_active=True),

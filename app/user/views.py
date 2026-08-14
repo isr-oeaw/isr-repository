@@ -18,10 +18,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
 from .forms import (
-    CustomUserCreationForm, CustomUserEditForm, RoleForm, RoleFilterForm, UserSettingsForm,
-    UserNotificationForm, UserProfileForm, DataExportForm, APIKeyCreateForm, APIKeyRevokeForm,
-    AdminSetPasswordForm,
+    CustomUserCreationForm, CustomUserEditForm, AdminUserCreateForm, RoleForm, RoleFilterForm,
+    UserSettingsForm, UserNotificationForm, UserProfileForm, DataExportForm, APIKeyCreateForm,
+    APIKeyRevokeForm, AdminSetPasswordForm,
 )
+from .email_utils import send_account_invite_email
 from .models import Role, APIKey
 
 CustomUser = get_user_model()
@@ -550,7 +551,7 @@ class UsersListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
 class UserCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = get_user_model()
-    form_class = CustomUserCreationForm
+    form_class = AdminUserCreateForm
     template_name = 'user/user_form.html'
     success_url = reverse_lazy('user-list')
 
@@ -561,19 +562,25 @@ class UserCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
             (self.request.user.role and self.request.user.role.name == 'Administrator')
         )
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        # Since this is an admin view, mark as created by admin
-        kwargs['created_by_admin'] = True
-        return kwargs
-
     def form_valid(self, form):
-        user = form.save()
-        messages.success(
-            self.request, 
-            f'User {user.username} has been created and approved successfully.'
-        )
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        email_sent = send_account_invite_email(self.object, request=self.request)
+        if email_sent:
+            messages.success(
+                self.request,
+                _('User %(username)s has been created and an invitation email has been sent.') % {
+                    'username': self.object.username,
+                },
+            )
+        else:
+            messages.warning(
+                self.request,
+                _('User %(username)s has been created, but the invitation email could not be sent. '
+                  'Please ask the user to use password reset or resend the invite manually.') % {
+                    'username': self.object.username,
+                },
+            )
+        return response
 
     def form_invalid(self, form):
         messages.error(self.request, 'Please correct the errors below.')
