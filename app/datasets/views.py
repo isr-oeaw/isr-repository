@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
-from django.http import HttpResponse, Http404, FileResponse
+from django.http import HttpResponse, Http404, FileResponse, JsonResponse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy, reverse
 from django.db.models import Q, Count
@@ -24,6 +24,58 @@ from .models import (
     DatasetAnalysis,
 )
 from .forms import DatasetForm, DatasetFilterForm, DatasetVersionForm, DatasetCategoryForm, DatasetCategoryFilterForm, CommentForm, CommentEditForm, PublisherForm, PublisherFilterForm, DatasetProjectAssignmentForm, DatasetAnalysisForm
+from .chunk_uploads import append_chunk, remove_chunk_upload
+
+
+def user_can_manage_dataset_versions(user, dataset):
+    """Return True if the user may add versions to the dataset."""
+    return (
+        user == dataset.owner
+        or user in dataset.contributors.all()
+        or user.is_superuser
+    )
+
+
+@login_required
+def upload_dataset_version_chunk(request, dataset_pk):
+    """Append one chunk to a staged dataset version upload."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'POST required.'}, status=405)
+
+    dataset = get_object_or_404(Dataset, pk=dataset_pk)
+    if not user_can_manage_dataset_versions(request.user, dataset):
+        return JsonResponse({'success': False, 'error': 'Permission denied.'}, status=403)
+
+    upload_id = request.POST.get('upload_id')
+    file_index = request.POST.get('file_index')
+    chunk_index = request.POST.get('chunk_index')
+    total_chunks = request.POST.get('total_chunks')
+    filename = request.POST.get('filename')
+    chunk_file = request.FILES.get('file')
+
+    if not all([
+        upload_id,
+        file_index is not None,
+        chunk_index is not None,
+        total_chunks,
+        filename,
+        chunk_file,
+    ]):
+        return JsonResponse({'success': False, 'error': 'Missing required fields.'}, status=400)
+
+    try:
+        result = append_chunk(
+            request.user,
+            upload_id,
+            file_index,
+            chunk_index,
+            total_chunks,
+            filename,
+            chunk_file,
+        )
+        return JsonResponse({'success': True, **result})
+    except ValueError as exc:
+        return JsonResponse({'success': False, 'error': str(exc)}, status=400)
 
 
 class AdministratorOnlyMixin(UserPassesTestMixin):
@@ -411,6 +463,7 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['dataset'] = self.dataset
+        kwargs['user'] = self.request.user
         return kwargs
 
     def form_valid(self, form):
@@ -421,6 +474,7 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
             input_method = form.cleaned_data.get('input_method')
             uploaded_files = form.cleaned_data.get('uploaded_files', [])
             total_upload_size = form.cleaned_data.get('uploaded_files_total_size', 0)
+            upload_id = form.cleaned_data.get('upload_id')
 
             logger.info(f'Creating dataset version for dataset {self.dataset.pk}, user: {self.request.user.username}, '
                        f'method: {input_method}, files: {len(uploaded_files)}, total_size: {total_upload_size}')
@@ -463,6 +517,9 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
                         except Exception as e:
                             logger.error(f'Error saving file {upload.name}: {str(e)}', exc_info=True)
                             raise
+
+            if upload_id:
+                remove_chunk_upload(self.request.user.pk, upload_id)
 
             # Send notification about new version
             try:
@@ -545,19 +602,6 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse('datasets:dataset_detail', kwargs={'pk': self.dataset.pk})
-    
-    def dispatch(self, request, *args, **kwargs):
-        # Get the dataset and check permissions
-        self.dataset = get_object_or_404(Dataset, pk=kwargs['dataset_pk'])
-        
-        # Check if user can add versions (owner, contributor, or superuser)
-        if not (request.user == self.dataset.owner or 
-                request.user in self.dataset.contributors.all() or 
-                request.user.is_superuser):
-            messages.error(request, 'You do not have permission to add versions to this dataset.')
-            return redirect('datasets:dataset_detail', pk=self.dataset.pk)
-        
-        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         from django.conf import settings
@@ -565,6 +609,10 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['dataset'] = self.dataset
         context['max_dataset_upload_size'] = settings.MAX_DATASET_UPLOAD_SIZE
+        context['chunk_upload_url'] = reverse(
+            'datasets:dataset_version_upload_chunk',
+            kwargs={'dataset_pk': self.dataset.pk},
+        )
         return context
 
 

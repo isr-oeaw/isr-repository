@@ -60,8 +60,11 @@ services:
       - "traefik.http.routers.dataplexity-isrdatasets.service=dataplexity-isrdatasets"
       - "traefik.http.services.dataplexity-isrdatasets.loadbalancer.server.port=80"
       - "traefik.http.services.dataplexity-isrdatasets.loadbalancer.responseforwarding.flushinterval=100ms"
+      - "traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.dialtimeout=30s"
+      - "traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.responseheadertimeout=3600s"
+      - "traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.idleconntimeout=3600s"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.dataplexity-isrdatasets.middlewares=default@file"
+      - "traefik.http.routers.dataplexity-isrdatasets.middlewares=isr-longtimeout,default@file"
     networks:
       - proxy
       - internal

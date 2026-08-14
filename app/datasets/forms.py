@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -281,6 +283,7 @@ class DatasetVersionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.dataset = kwargs.pop('dataset', None)
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
         # Add help text for fields
@@ -324,38 +327,66 @@ class DatasetVersionForm(forms.ModelForm):
         
         # Validate based on input method
         if input_method == 'upload':
-            if not uploaded_files:
+            upload_id = self.data.get('upload_id')
+            chunked_files_raw = self.data.get('chunked_files')
+
+            if upload_id and chunked_files_raw:
+                from .chunk_uploads import load_assembled_upload_files
+
+                if not self.user or not self.user.is_authenticated:
+                    raise forms.ValidationError('Authentication required for chunked uploads.')
+
+                try:
+                    expected_files = json.loads(chunked_files_raw)
+                except (json.JSONDecodeError, TypeError):
+                    raise forms.ValidationError('Invalid chunked file metadata.')
+
+                if not isinstance(expected_files, list) or not expected_files:
+                    raise forms.ValidationError('No chunked files specified.')
+
+                try:
+                    uploaded_files, total_upload_size = load_assembled_upload_files(
+                        self.user,
+                        upload_id,
+                        expected_files,
+                    )
+                except ValueError as exc:
+                    raise forms.ValidationError(str(exc)) from exc
+
+                cleaned_data['upload_id'] = upload_id
+                self.instance.file_size = total_upload_size
+            elif not uploaded_files:
                 self.add_error('files', 'Please upload at least one file when using the upload method.')
                 raise forms.ValidationError('Please upload at least one file when using the upload method.')
+            else:
+                max_upload_size = settings.MAX_DATASET_UPLOAD_SIZE
+                max_upload_gb = max_upload_size // (1024 * 1024 * 1024)
+
+                for upload in uploaded_files:
+                    if upload.size > max_upload_size:
+                        size_gb = upload.size / (1024 * 1024 * 1024)
+                        self.add_error(
+                            'files',
+                            f'File "{upload.name}" ({size_gb:.2f} GB) exceeds the {max_upload_gb}GB size limit.',
+                        )
+                        raise forms.ValidationError(f'Each uploaded file must be {max_upload_gb}GB or smaller.')
+
+                    total_upload_size += upload.size
+
+                if total_upload_size > max_upload_size:
+                    total_gb = total_upload_size / (1024 * 1024 * 1024)
+                    self.add_error(
+                        'files',
+                        f'Total upload size ({total_gb:.2f} GB) exceeds the {max_upload_gb}GB limit.',
+                    )
+                    raise forms.ValidationError(f'Total upload size must be {max_upload_gb}GB or smaller.')
+
+                self.instance.file_size = total_upload_size
+
             if file_url:
                 raise forms.ValidationError('Please do not provide a URL when uploading a file.')
             if file_size_text:
                 raise forms.ValidationError('File size will be calculated automatically when uploading.')
-            
-            max_upload_size = settings.MAX_DATASET_UPLOAD_SIZE
-            max_upload_gb = max_upload_size // (1024 * 1024 * 1024)
-
-            for upload in uploaded_files:
-                if upload.size > max_upload_size:
-                    size_gb = upload.size / (1024 * 1024 * 1024)
-                    self.add_error(
-                        'files',
-                        f'File "{upload.name}" ({size_gb:.2f} GB) exceeds the {max_upload_gb}GB size limit.',
-                    )
-                    raise forms.ValidationError(f'Each uploaded file must be {max_upload_gb}GB or smaller.')
-
-                total_upload_size += upload.size
-
-            if total_upload_size > max_upload_size:
-                total_gb = total_upload_size / (1024 * 1024 * 1024)
-                self.add_error(
-                    'files',
-                    f'Total upload size ({total_gb:.2f} GB) exceeds the {max_upload_gb}GB limit.',
-                )
-                raise forms.ValidationError(f'Total upload size must be {max_upload_gb}GB or smaller.')
-
-            # Update file_size field with total upload size
-            self.instance.file_size = total_upload_size
             
         elif input_method == 'url':
             # Either URL or description must be provided (or both)
