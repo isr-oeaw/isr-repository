@@ -363,7 +363,7 @@
                                 <tr>
                                     <td>
                                         <span class="badge bg-primary">v{{ version.version_number }}</span>
-                                        {% if forloop.first %}
+                                        {% if version.is_current %}
                                         <span class="badge bg-success ms-1">{% trans "Latest" %}</span>
                                         {% endif %}
                                     </td>

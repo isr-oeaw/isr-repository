@@ -489,6 +489,10 @@
                                         <p><strong>{% trans "Using Authorization Header" %}:</strong></p>
                                         <pre class="bg-dark text-light p-3 rounded"><code>curl -H "Authorization: Api-Key YOUR_API_KEY" \
   https://your-domain.com/datasets/DATASET_ID/download/</code></pre>
+
+                                        <p class="mt-3"><strong>{% trans "Download latest version" %}:</strong></p>
+                                        <pre class="bg-dark text-light p-3 rounded"><code>curl -H "Authorization: Api-Key YOUR_API_KEY" \
+  https://your-domain.com/datasets/DATASET_ID/download/latest/</code></pre>
                                         
                                         <p class="mt-3"><strong>{% trans "Using Query Parameter" %}:</strong></p>
                                         <pre class="bg-dark text-light p-3 rounded"><code>curl "https://your-domain.com/datasets/DATASET_ID/download/?api_key=YOUR_API_KEY"</code></pre>

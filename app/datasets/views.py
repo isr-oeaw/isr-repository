@@ -324,7 +324,7 @@ class DatasetDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
-def dataset_download(request, pk):
+def dataset_download(request, pk, latest=False):
     """Handle dataset downloads (requires authentication via session or API key)"""
     dataset = get_object_or_404(Dataset, pk=pk)
     
@@ -354,7 +354,11 @@ def dataset_download(request, pk):
     version_id = request.GET.get('version')
     version = None
 
-    if version_id:
+    if latest:
+        version = dataset.versions.filter(is_current=True).first()
+        if not version:
+            version = dataset.versions.order_by('-created_at').first()
+    elif version_id:
         try:
             version = dataset.versions.get(id=version_id)
         except DatasetVersion.DoesNotExist:

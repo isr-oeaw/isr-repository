@@ -10,6 +10,7 @@ urlpatterns = [
     path('create/', views.DatasetCreateView.as_view(), name='dataset_create'),
     path('<uuid:pk>/edit/', views.DatasetUpdateView.as_view(), name='dataset_edit'),
     path('<uuid:pk>/delete/', views.DatasetDeleteView.as_view(), name='dataset_delete'),
+    path('<uuid:pk>/download/latest/', views.dataset_download, {'latest': True}, name='dataset_download_latest'),
     path('<uuid:pk>/download/', views.dataset_download, name='dataset_download'),
     path('<uuid:pk>/assign-project/', views.assign_dataset_to_project, name='assign_to_project'),
     path('<uuid:dataset_pk>/version/upload-chunk/', views.upload_dataset_version_chunk, name='dataset_version_upload_chunk'),
