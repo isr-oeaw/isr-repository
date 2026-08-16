@@ -1470,6 +1470,97 @@ class DatasetDownloadViewTests(TestCase):
         self.assertEqual(self.dataset.download_count, 1)
         self.assertEqual(DatasetDownload.objects.count(), 1)
 
+    def test_download_latest_serves_current_version(self):
+        """Latest download endpoint serves the version marked is_current."""
+        old_version = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='0.9',
+            description='Older release',
+            created_by=self.owner,
+            is_current=False,
+        )
+        old_file = SimpleUploadedFile('old.csv', b'old,data\n')
+        DatasetVersionFile.objects.create(
+            version=old_version,
+            file=old_file,
+            file_size=old_file.size,
+            original_name='old.csv',
+        )
+
+        current_version = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='2.0',
+            description='Current release',
+            created_by=self.owner,
+            is_current=True,
+        )
+        self.version.is_current = False
+        self.version.save(update_fields=['is_current'])
+
+        current_file = SimpleUploadedFile('current.csv', b'current,data\n')
+        current_attachment = DatasetVersionFile.objects.create(
+            version=current_version,
+            file=current_file,
+            file_size=current_file.size,
+            original_name='current.csv',
+        )
+
+        url = reverse('datasets:dataset_download_latest', args=[self.dataset.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(current_attachment.display_name, response.get('Content-Disposition', ''))
+
+    def test_download_latest_ignores_version_query_param(self):
+        """Latest download endpoint ignores ?version= and always uses current."""
+        old_version = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='0.9',
+            description='Older release',
+            created_by=self.owner,
+            is_current=False,
+        )
+        old_file = SimpleUploadedFile('old.csv', b'old,data\n')
+        old_attachment = DatasetVersionFile.objects.create(
+            version=old_version,
+            file=old_file,
+            file_size=old_file.size,
+            original_name='old.csv',
+        )
+
+        url = reverse('datasets:dataset_download_latest', args=[self.dataset.pk])
+        response = self.client.get(url, {'version': old_version.id, 'file': old_attachment.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.attachment_one.display_name, response.get('Content-Disposition', ''))
+
+    def test_download_latest_without_versions_redirects(self):
+        """Latest download with no versions redirects to dataset detail."""
+        empty_dataset = Dataset.objects.create(
+            title='Empty Dataset',
+            description='No versions yet',
+            owner=self.owner,
+        )
+        url = reverse('datasets:dataset_download_latest', args=[empty_dataset.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('datasets:dataset_detail', args=[empty_dataset.pk]))
+
+    def test_download_latest_without_auth_returns_json_401(self):
+        """Unauthenticated API request to latest download returns JSON 401."""
+        self.client.logout()
+        url = reverse('datasets:dataset_download_latest', args=[self.dataset.pk])
+        response = self.client.get(url, HTTP_ACCEPT='application/json')
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('error', response.json())
+
+    def test_download_latest_without_auth_redirects(self):
+        """Unauthenticated browser request to latest download redirects to login."""
+        self.client.logout()
+        url = reverse('datasets:dataset_download_latest', args=[self.dataset.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
+
+
 class DatasetDeleteViewTests(TestCase):
     """Test cases for DatasetDeleteView - superuser only deletion"""
     

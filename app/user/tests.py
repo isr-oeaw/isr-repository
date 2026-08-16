@@ -2985,3 +2985,16 @@ class APIKeyDatasetDownloadTests(TestCase):
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response.url)
+
+    def test_download_latest_with_api_key_header(self):
+        """Test downloading latest version with API key in Authorization header"""
+        url = reverse('datasets:dataset_download_latest', kwargs={'pk': self.dataset.pk})
+
+        response = self.client.get(
+            url,
+            HTTP_AUTHORIZATION=f'Api-Key {self.api_key.key}',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/octet-stream')
+        self.assertIn('attachment', response['Content-Disposition'])
