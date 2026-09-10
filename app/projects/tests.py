@@ -16,6 +16,14 @@ from .views import (
 User = get_user_model()
 
 
+def _assign_editor_role(user):
+    from user.models import Role
+
+    user.role = Role.objects.get(name='Editor')
+    user.save(update_fields=['role'])
+    return user
+
+
 class ProjectModelTests(TestCase):
     """Test cases for Project model"""
     
@@ -539,11 +547,11 @@ class ProjectViewTests(TestCase):
     def setUp(self):
         """Set up test data"""
         self.client = Client()
-        self.user = User.objects.create_user(
+        self.user = _assign_editor_role(User.objects.create_user(
             username='testuser',
             email='test@example.com',
-            password='testpass123'
-        )
+            password='testpass123',
+        ))
         
         self.collaborator = User.objects.create_user(
             username='collaborator',
@@ -795,11 +803,11 @@ class ProjectIntegrationTests(TestCase):
     def setUp(self):
         """Set up test data"""
         self.client = Client()
-        self.user = User.objects.create_user(
+        self.user = _assign_editor_role(User.objects.create_user(
             username='testuser',
             email='test@example.com',
-            password='testpass123'
-        )
+            password='testpass123',
+        ))
         
         self.collaborator = User.objects.create_user(
             username='collaborator',
@@ -1048,17 +1056,8 @@ class ExternalPartnerTests(TestCase):
 
         self.client = Client()
 
-        self.partner_role = Role.objects.create(
-            name='External Partner',
-            description='Invited collaborator with access limited to assigned projects',
-            permissions={'permissions': ['dataset.view', 'project.view']},
-            is_active=True,
-        )
-        self.admin_role = Role.objects.create(
-            name='Administrator',
-            permissions={'permissions': ['project.view', 'user.manage']},
-            is_active=True,
-        )
+        self.partner_role = Role.objects.get(name='External Partner')
+        self.admin_role = Role.objects.get(name='Administrator')
 
         self.owner = User.objects.create_user(
             username='owner',
@@ -1212,7 +1211,7 @@ class ExternalPartnerTests(TestCase):
         self.assertTrue(invited.is_approved)
         self.assertIn(invited, self.assigned_project.collaborators.all())
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('/accounts/login/', mail.outbox[0].body)
+        self.assertIn('/user/login/', mail.outbox[0].body)
 
     def test_invite_existing_user_only_adds_collaborator(self):
         """Inviting an existing user does not change their role."""

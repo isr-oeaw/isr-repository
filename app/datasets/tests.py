@@ -1587,7 +1587,7 @@ class DatasetDownloadViewTests(TestCase):
         )
 
         url = reverse('datasets:dataset_download_latest', args=[self.dataset.pk])
-        response = self.client.get(url, {'version': old_version.id, 'file': old_attachment.id})
+        response = self.client.get(url, {'version': old_version.id})
         self.assertEqual(response.status_code, 200)
         self.assertIn(self.attachment_one.display_name, response.get('Content-Disposition', ''))
 
