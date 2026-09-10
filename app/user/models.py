@@ -1,10 +1,13 @@
 import secrets
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from auditlog.registry import auditlog
 from auditlog.models import AuditlogHistoryField
+
+from .access import EXTERNAL_PARTNER_ROLE
 
 
 class Role(models.Model):
@@ -176,6 +179,31 @@ class CustomUser(AbstractUser):
             # If allauth is not available or no EmailAddress record exists,
             # assume email is verified (for backwards compatibility)
             return True
+
+    @property
+    def is_external_partner(self):
+        """Return True when the user has the External Partner role."""
+        return bool(
+            self.role
+            and self.role.is_active
+            and self.role.name == EXTERNAL_PARTNER_ROLE
+        )
+
+    def assigned_projects(self):
+        """Projects the user owns or collaborates on."""
+        from projects.models import Project
+
+        return Project.objects.filter(
+            Q(owner=self) | Q(collaborators=self)
+        ).distinct()
+
+    def assigned_datasets(self):
+        """Datasets linked to projects the user is assigned to."""
+        from datasets.models import Dataset
+
+        return Dataset.objects.filter(
+            projects__in=self.assigned_projects()
+        ).distinct()
 
 
 class APIKey(models.Model):

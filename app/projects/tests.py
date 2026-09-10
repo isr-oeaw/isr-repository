@@ -1037,3 +1037,215 @@ class ProjectIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         projects = response.context['projects']
         self.assertTrue(any('Data Analysis' in p.title and p.status == 'completed' for p in projects))
+
+
+class ExternalPartnerTests(TestCase):
+    """Tests for External Partner role, scoped access, and project invites."""
+
+    def setUp(self):
+        from user.models import Role
+        from datasets.models import Dataset, DatasetCategory, Publisher
+
+        self.client = Client()
+
+        self.partner_role = Role.objects.create(
+            name='External Partner',
+            description='Invited collaborator with access limited to assigned projects',
+            permissions={'permissions': ['dataset.view', 'project.view']},
+            is_active=True,
+        )
+        self.admin_role = Role.objects.create(
+            name='Administrator',
+            permissions={'permissions': ['project.view', 'user.manage']},
+            is_active=True,
+        )
+
+        self.owner = User.objects.create_user(
+            username='owner',
+            email='owner@example.com',
+            password='testpass123',
+            is_approved=True,
+        )
+        self.admin_user = User.objects.create_user(
+            username='adminuser',
+            email='admin@example.com',
+            password='testpass123',
+            role=self.admin_role,
+            is_approved=True,
+        )
+        self.partner = User.objects.create_user(
+            username='partner',
+            email='partner@example.com',
+            password='testpass123',
+            role=self.partner_role,
+            is_approved=True,
+        )
+        self.other_user = User.objects.create_user(
+            username='other',
+            email='other@example.com',
+            password='testpass123',
+            is_approved=True,
+        )
+
+        self.assigned_project = Project.objects.create(
+            title='Assigned Project',
+            description='Partner has access',
+            owner=self.owner,
+            access_level='private',
+        )
+        self.assigned_project.collaborators.add(self.partner)
+
+        self.public_project = Project.objects.create(
+            title='Public Project',
+            description='Visible to everyone except partners',
+            owner=self.owner,
+            access_level='public',
+        )
+
+        self.category = DatasetCategory.objects.create(
+            name='Partner Category',
+            description='Test category',
+            color='#007bff',
+            is_active=True,
+        )
+        self.publisher = Publisher.objects.create(
+            name='Partner Publisher',
+            description='Test publisher',
+            is_active=True,
+        )
+        self.assigned_dataset = Dataset.objects.create(
+            title='Assigned Dataset',
+            description='Linked to assigned project',
+            owner=self.owner,
+            category=self.category,
+            publisher=self.publisher,
+            status='published',
+        )
+        self.assigned_dataset.projects.add(self.assigned_project)
+
+        self.other_dataset = Dataset.objects.create(
+            title='Other Dataset',
+            description='Not linked to partner project',
+            owner=self.owner,
+            category=self.category,
+            publisher=self.publisher,
+            status='published',
+        )
+
+    def test_external_partner_role_helpers(self):
+        """External Partner role is detected only for that role."""
+        self.assertTrue(self.partner.is_external_partner)
+        self.assertFalse(self.owner.is_external_partner)
+        self.assertFalse(self.admin_user.is_external_partner)
+
+    def test_partner_assigned_projects_and_datasets(self):
+        """Partner helpers return only assigned projects and their datasets."""
+        self.assertEqual(self.partner.assigned_projects().count(), 1)
+        self.assertIn(self.assigned_project, self.partner.assigned_projects())
+        self.assertEqual(self.partner.assigned_datasets().count(), 1)
+        self.assertIn(self.assigned_dataset, self.partner.assigned_datasets())
+
+    def test_partner_cannot_access_unassigned_project(self):
+        """Partner gets 404 for projects they are not assigned to."""
+        self.client.login(username='partner', password='testpass123')
+        response = self.client.get(
+            reverse('projects:project_detail', kwargs={'pk': self.public_project.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_partner_can_access_assigned_project(self):
+        """Partner can view a project they collaborate on."""
+        self.client.login(username='partner', password='testpass123')
+        response = self.client.get(
+            reverse('projects:project_detail', kwargs={'pk': self.assigned_project.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Assigned Project')
+
+    def test_partner_project_list_omits_unassigned_public_projects(self):
+        """Partner project list excludes public projects they are not on."""
+        self.client.login(username='partner', password='testpass123')
+        response = self.client.get(reverse('projects:project_list'))
+        self.assertEqual(response.status_code, 200)
+        project_titles = [p.title for p in response.context['projects']]
+        self.assertIn('Assigned Project', project_titles)
+        self.assertNotIn('Public Project', project_titles)
+
+    def test_partner_public_project_not_accessible_via_model(self):
+        """External partners do not get public catalog access."""
+        self.assertFalse(self.public_project.is_accessible_by(self.partner))
+
+    def test_partner_cannot_access_unassigned_dataset(self):
+        """Partner gets 404 for datasets outside assigned projects."""
+        self.client.login(username='partner', password='testpass123')
+        response = self.client.get(
+            reverse('datasets:dataset_detail', kwargs={'pk': self.other_dataset.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_partner_can_access_assigned_project_dataset(self):
+        """Partner can view datasets linked to assigned projects."""
+        self.client.login(username='partner', password='testpass123')
+        response = self.client.get(
+            reverse('datasets:dataset_detail', kwargs={'pk': self.assigned_dataset.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Assigned Dataset')
+
+    def test_owner_can_invite_new_partner(self):
+        """Invite creates External Partner, adds collaborator, and sends login email."""
+        from django.core import mail
+
+        self.client.login(username='owner', password='testpass123')
+        response = self.client.post(
+            reverse('projects:project_invite_partner', kwargs={'pk': self.assigned_project.pk}),
+            {
+                'email': 'newpartner@example.com',
+                'first_name': 'New',
+                'last_name': 'Partner',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        invited = User.objects.get(email='newpartner@example.com')
+        self.assertTrue(invited.is_external_partner)
+        self.assertTrue(invited.is_approved)
+        self.assertIn(invited, self.assigned_project.collaborators.all())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('/accounts/login/', mail.outbox[0].body)
+
+    def test_invite_existing_user_only_adds_collaborator(self):
+        """Inviting an existing user does not change their role."""
+        from django.core import mail
+
+        self.client.login(username='owner', password='testpass123')
+        response = self.client.post(
+            reverse('projects:project_invite_partner', kwargs={'pk': self.assigned_project.pk}),
+            {'email': self.other_user.email},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(self.other_user, self.assigned_project.collaborators.all())
+        self.other_user.refresh_from_db()
+        self.assertIsNone(self.other_user.role)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_non_owner_cannot_invite_partner(self):
+        """Users without invite permission cannot invite partners."""
+        self.client.login(username='other', password='testpass123')
+        response = self.client.post(
+            reverse('projects:project_invite_partner', kwargs={'pk': self.assigned_project.pk}),
+            {'email': 'blocked@example.com'},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(User.objects.filter(email='blocked@example.com').exists())
+
+    def test_administrator_can_invite_partner(self):
+        """Administrators can invite partners to any project."""
+        self.client.login(username='adminuser', password='testpass123')
+        response = self.client.post(
+            reverse('projects:project_invite_partner', kwargs={'pk': self.public_project.pk}),
+            {'email': 'admin-invited@example.com'},
+        )
+        self.assertEqual(response.status_code, 302)
+        invited = User.objects.get(email='admin-invited@example.com')
+        self.assertIn(invited, self.public_project.collaborators.all())

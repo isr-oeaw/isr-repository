@@ -10,7 +10,11 @@
 {% block content %}
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
 
-<p style="margin: 0 0 24px 0;">{% blocktrans %}An administrator has created an account for you on {{ site_name }}. Please set your password using the button below before signing in.{% endblocktrans %}</p>
+{% if project %}
+<p style="margin: 0 0 24px 0;">{% blocktrans with project_title=project.title %}You have been invited to collaborate on the project "{{ project_title }}" on {{ site_name }}. Sign in with your email using the login page below.{% endblocktrans %}</p>
+{% else %}
+<p style="margin: 0 0 24px 0;">{% blocktrans %}An administrator has created an account for you on {{ site_name }}. Sign in with your email using the login page below.{% endblocktrans %}</p>
+{% endif %}
 
 <div class="info-box">
     <strong style="color: #1A1A1A;">{% trans "Your account details" %}</strong>
@@ -39,20 +43,30 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-            <a href="{{ password_set_url }}" class="btn" style="background-color: #0047BB; color: #FFFFFF;">
-                {% trans "Set Your Password" %}
+            <a href="{{ login_url }}" class="btn" style="background-color: #0047BB; color: #FFFFFF;">
+                {% trans "Sign in" %}
             </a>
         </td>
     </tr>
 </table>
 
+<p style="margin: 0 0 16px 0;">{% trans "On the login page, enter your email address to receive a sign-in code or magic link. You can also sign in with a password if you have set one." %}</p>
+
 <div class="notice">
-    <strong style="color: #1A1A1A;">{% trans "Important:" %}</strong>
-    <p style="margin: 8px 0 0 0;">{% trans "You will not be able to sign in until you have set your password using the link above." %}</p>
+    <strong style="color: #1A1A1A;">{% trans "Optional:" %}</strong>
+    <p style="margin: 8px 0 0 0;">{% trans "If you prefer to use a password, you can set one using the link below." %}</p>
 </div>
 
-<p style="margin: 24px 0 8px 0;">{% trans "If the button doesn't work, copy and paste this link into your browser:" %}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td align="center" style="padding: 16px 0 8px 0;">
+            <a href="{{ password_set_url }}" style="color: #0047BB;">{% trans "Set your password" %}</a>
+        </td>
+    </tr>
+</table>
+
+<p style="margin: 24px 0 8px 0;">{% trans "If the sign-in button doesn't work, copy and paste this link into your browser:" %}</p>
 <p style="margin: 0; word-break: break-all;">
-    <a href="{{ password_set_url }}" style="color: #0047BB;">{{ password_set_url }}</a>
+    <a href="{{ login_url }}" style="color: #0047BB;">{{ login_url }}</a>
 </p>
 {% endblock content %}

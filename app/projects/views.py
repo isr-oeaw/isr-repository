@@ -1,16 +1,25 @@
+import re
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.generic import (
     ListView, DetailView, CreateView, UpdateView, DeleteView
 )
+from django.views.decorators.http import require_POST
 from django.db.models import Q, Count
 from django.urls import reverse_lazy
 from django.http import Http404
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
+
+from user.access import EXTERNAL_PARTNER_ROLE, user_can_invite_project_partner
+from user.email_utils import send_account_invite_email
+from user.models import Role
 
 from .models import Project
-from .forms import ProjectForm, ProjectFilterForm, ProjectTransferOwnershipForm
+from .forms import ProjectForm, ProjectFilterForm, ProjectTransferOwnershipForm, ProjectPartnerInviteForm
 
 User = get_user_model()
 
@@ -56,11 +65,17 @@ class ProjectListView(LoginRequiredMixin, ListView):
         
         # Apply access control
         if not self.request.user.is_superuser:
-            queryset = queryset.filter(
-                Q(owner=self.request.user) |
-                Q(collaborators=self.request.user) |
-                Q(access_level='public')
-            ).distinct()
+            if self.request.user.is_external_partner:
+                queryset = queryset.filter(
+                    Q(owner=self.request.user) |
+                    Q(collaborators=self.request.user)
+                ).distinct()
+            else:
+                queryset = queryset.filter(
+                    Q(owner=self.request.user) |
+                    Q(collaborators=self.request.user) |
+                    Q(access_level='public')
+                ).distinct()
         
         # Apply filters
         search = self.request.GET.get('search')
@@ -121,8 +136,108 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
         context['is_collaborator'] = (
             self.request.user in project.collaborators.all()
         )
+
+        context['can_invite_partner'] = user_can_invite_project_partner(
+            self.request.user, project
+        )
+        context['partner_invite_form'] = ProjectPartnerInviteForm()
         
         return context
+
+
+def _username_from_email(email):
+    local = email.split('@')[0]
+    base = re.sub(r'[^a-zA-Z0-9._-]', '', local)[:30] or 'partner'
+    username = base
+    suffix = 1
+    while User.objects.filter(username=username).exists():
+        username = f'{base}{suffix}'
+        suffix += 1
+    return username
+
+
+def _ensure_verified_email_address(user):
+    from allauth.account.models import EmailAddress
+
+    email_address, created = EmailAddress.objects.get_or_create(
+        user=user,
+        email=user.email,
+        defaults={'verified': True, 'primary': True},
+    )
+    if not created:
+        email_address.verified = True
+        email_address.primary = True
+        email_address.save(update_fields=['verified', 'primary'])
+
+
+@login_required
+@require_POST
+def invite_project_partner(request, pk):
+    """Invite an external partner by email and add them as a project collaborator."""
+    project = get_object_or_404(Project, pk=pk)
+
+    if not user_can_invite_project_partner(request.user, project):
+        messages.error(
+            request,
+            _('You do not have permission to invite partners to this project.'),
+        )
+        return redirect('projects:project_detail', pk=pk)
+
+    form = ProjectPartnerInviteForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, _('Please enter a valid email address.'))
+        return redirect('projects:project_detail', pk=pk)
+
+    email = form.cleaned_data['email'].strip().lower()
+    first_name = form.cleaned_data.get('first_name', '').strip()
+    last_name = form.cleaned_data.get('last_name', '').strip()
+
+    existing_user = User.objects.filter(email__iexact=email).first()
+    if existing_user:
+        project.collaborators.add(existing_user)
+        messages.success(
+            request,
+            _('%(email)s has been added as a project collaborator.') % {'email': email},
+        )
+        return redirect('projects:project_detail', pk=pk)
+
+    try:
+        partner_role = Role.objects.get(name=EXTERNAL_PARTNER_ROLE, is_active=True)
+    except Role.DoesNotExist:
+        messages.error(
+            request,
+            _('External Partner role is not configured. Please contact an administrator.'),
+        )
+        return redirect('projects:project_detail', pk=pk)
+
+    partner = User(
+        username=_username_from_email(email),
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        role=partner_role,
+        is_approved=True,
+    )
+    partner.set_unusable_password()
+    partner.save()
+    _ensure_verified_email_address(partner)
+    project.collaborators.add(partner)
+
+    email_sent = send_account_invite_email(partner, request=request, project=project)
+    if email_sent:
+        messages.success(
+            request,
+            _('Partner invitation sent to %(email)s.') % {'email': email},
+        )
+    else:
+        messages.warning(
+            request,
+            _('Partner account created for %(email)s, but the invitation email could not be sent.') % {
+                'email': email,
+            },
+        )
+
+    return redirect('projects:project_detail', pk=pk)
 
 
 class ProjectCreateView(LoginRequiredMixin, EditorOrAdministratorMixin, CreateView):

@@ -161,6 +161,10 @@ class Project(models.Model):
         # Superusers can access all projects
         if user.is_superuser:
             return True
+
+        # External partners only see projects they are assigned to
+        if user.is_external_partner:
+            return False
         
         # Public projects are accessible to all authenticated users
         if self.access_level == 'public':

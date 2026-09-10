@@ -28,15 +28,29 @@ class HomePageView(LoginRequiredMixin, TemplateView):
             from user.models import CustomUser
             from projects.models import Project
             
+            user = self.request.user
+            is_partner = user.is_authenticated and user.is_external_partner
+            assigned_datasets = user.assigned_datasets() if is_partner else None
+            assigned_projects = user.assigned_projects() if is_partner else None
+
             # Get basic statistics
-            total_datasets = Dataset.objects.filter(status='published').count()
+            if is_partner:
+                total_datasets = assigned_datasets.filter(status='published').count()
+                total_projects = assigned_projects.count()
+            else:
+                total_datasets = Dataset.objects.filter(status='published').count()
+                total_projects = Project.objects.count()
             total_users = CustomUser.objects.filter(is_active=True).count()
-            total_projects = Project.objects.count()
             
             # Calculate total data volume (sum of all file sizes)
-            total_data_volume = DatasetVersion.objects.aggregate(
-                total_size=Sum('file_size')
-            )['total_size'] or 0
+            if is_partner:
+                total_data_volume = DatasetVersion.objects.filter(
+                    dataset__in=assigned_datasets
+                ).aggregate(total_size=Sum('file_size'))['total_size'] or 0
+            else:
+                total_data_volume = DatasetVersion.objects.aggregate(
+                    total_size=Sum('file_size')
+                )['total_size'] or 0
             
             # Convert bytes to human readable format
             if total_data_volume > 1024**4:  # TB
@@ -50,39 +64,62 @@ class HomePageView(LoginRequiredMixin, TemplateView):
             
             # Get recent datasets (last 30 days)
             thirty_days_ago = timezone.now() - timedelta(days=30)
-            recent_datasets = Dataset.objects.filter(
-                created_at__gte=thirty_days_ago,
-                status='published'
-            ).select_related('owner', 'category').order_by('-created_at')[:5]
-            
-            # Get popular datasets (by download count)
-            popular_datasets = Dataset.objects.filter(
-                status='published'
-            ).select_related('owner', 'category', 'publisher').order_by('-download_count')[:5]
-            
-            # Get recent activity (recent dataset versions)
-            recent_versions = DatasetVersion.objects.filter(
-                created_at__gte=thirty_days_ago
-            ).select_related('dataset', 'dataset__owner').order_by('-created_at')[:10]
-            
-            # Get categories with dataset counts
-            categories_with_counts = DatasetCategory.objects.annotate(
-                dataset_count=Count('datasets', filter=Q(datasets__status='published'))
-            ).filter(dataset_count__gt=0).order_by('-dataset_count')[:6]
+            if is_partner:
+                recent_datasets = assigned_datasets.filter(
+                    created_at__gte=thirty_days_ago,
+                    status='published',
+                ).select_related('owner', 'category').order_by('-created_at')[:5]
+                popular_datasets = assigned_datasets.filter(
+                    status='published',
+                ).select_related('owner', 'category', 'publisher').order_by('-download_count')[:5]
+                recent_versions = DatasetVersion.objects.filter(
+                    created_at__gte=thirty_days_ago,
+                    dataset__in=assigned_datasets,
+                ).select_related('dataset', 'dataset__owner').order_by('-created_at')[:10]
+                categories_with_counts = DatasetCategory.objects.filter(
+                    datasets__in=assigned_datasets,
+                    datasets__status='published',
+                ).annotate(
+                    dataset_count=Count('datasets', filter=Q(datasets__status='published'))
+                ).filter(dataset_count__gt=0).order_by('-dataset_count')[:6]
+            else:
+                recent_datasets = Dataset.objects.filter(
+                    created_at__gte=thirty_days_ago,
+                    status='published',
+                ).select_related('owner', 'category').order_by('-created_at')[:5]
+                popular_datasets = Dataset.objects.filter(
+                    status='published',
+                ).select_related('owner', 'category', 'publisher').order_by('-download_count')[:5]
+                recent_versions = DatasetVersion.objects.filter(
+                    created_at__gte=thirty_days_ago,
+                ).select_related('dataset', 'dataset__owner').order_by('-created_at')[:10]
+                categories_with_counts = DatasetCategory.objects.annotate(
+                    dataset_count=Count('datasets', filter=Q(datasets__status='published'))
+                ).filter(dataset_count__gt=0).order_by('-dataset_count')[:6]
             
             # Get user's datasets if logged in
             user_datasets = []
-            if self.request.user.is_authenticated:
-                user_datasets = Dataset.objects.filter(
-                    owner=self.request.user
-                ).select_related('category').order_by('-created_at')[:5]
+            if user.is_authenticated:
+                if is_partner:
+                    user_datasets = assigned_datasets.select_related(
+                        'category'
+                    ).order_by('-created_at')[:5]
+                else:
+                    user_datasets = Dataset.objects.filter(
+                        owner=user,
+                    ).select_related('category').order_by('-created_at')[:5]
             
             # Get user's recent activity
             user_recent_activity = []
-            if self.request.user.is_authenticated:
-                user_recent_activity = DatasetVersion.objects.filter(
-                    dataset__owner=self.request.user
-                ).select_related('dataset').order_by('-created_at')[:5]
+            if user.is_authenticated:
+                if is_partner:
+                    user_recent_activity = DatasetVersion.objects.filter(
+                        dataset__in=assigned_datasets,
+                    ).select_related('dataset').order_by('-created_at')[:5]
+                else:
+                    user_recent_activity = DatasetVersion.objects.filter(
+                        dataset__owner=user,
+                    ).select_related('dataset').order_by('-created_at')[:5]
             
             # System uptime (mock for now - could be real system monitoring)
             uptime_percentage = 99.9
