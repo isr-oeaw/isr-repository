@@ -660,6 +660,7 @@ class AnnouncementIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 302)
         
         # 8. Regular user views dashboard (should not see announcement)
+        self.client.logout()
         self.client.login(username='regular', password='regularpass123')
         response = self.client.get(reverse('home'))
         self.assertNotContains(response, 'System Maintenance - Updated')
@@ -693,6 +694,7 @@ class AnnouncementIntegrationTests(TestCase):
         future_announcement = Announcement.objects.get(title='Future Announcement')
         
         # 2. Regular user should not see future announcement
+        self.client.logout()
         self.client.login(username='regular', password='regularpass123')
         response = self.client.get(reverse('home'))
         self.assertNotContains(response, 'Future Announcement')
