@@ -1,4 +1,4 @@
-{% load i18n %}{% autoescape off %}{% blocktrans with site_name=site_name|default:"ISR Datasets" %}Hello,
+{% load i18n %}{% autoescape off %}{% blocktrans with site_name=site_name|default:"ISR Repository" %}Hello,
 
 You requested to sign in to {{ site_name }}.
 

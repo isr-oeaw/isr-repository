@@ -2,13 +2,13 @@ services:
   db:
     image: postgis/postgis:15-3.3
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-isrdatasets}
+      POSTGRES_DB: ${POSTGRES_DB:-isrrepository}
       POSTGRES_USER: ${POSTGRES_USER:-isruser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-isrpassword}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-isruser} -d ${POSTGRES_DB:-isrdatasets}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-isruser} -d ${POSTGRES_DB:-isrrepository}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -16,11 +16,11 @@ services:
       - internal
 
   app:
-    image: ghcr.io/silvioheinze/isr-datasets:latest
+    image: ghcr.io/silvioheinze/isr-repository:latest
     command: >
       sh -c "python manage.py collectstatic --noinput && python manage.py migrate && gunicorn main.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3600 --graceful-timeout 30 --keep-alive 5"
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-isrdatasets}
+      - POSTGRES_DB=${POSTGRES_DB:-isrrepository}
       - POSTGRES_USER=${POSTGRES_USER:-isruser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-isrpassword}
       - POSTGRES_HOST=db
@@ -44,7 +44,7 @@ services:
       - internal
   
   nginx:
-    image: ghcr.io/silvioheinze/isr-datasets-nginx:latest
+    image: ghcr.io/silvioheinze/isr-repository-nginx:latest
     restart: unless-stopped
     volumes:
       - static_data:/home/app/web/staticfiles
@@ -53,18 +53,18 @@ services:
       - app
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dataplexity-isrdatasets.entrypoints=https"
-      - "traefik.http.routers.dataplexity-isrdatasets.rule=Host(`isrdatasets.dataplexity.eu`)"
-      - "traefik.http.routers.dataplexity-isrdatasets.tls=true"
-      - "traefik.http.routers.dataplexity-isrdatasets.tls.certresolver=http"
-      - "traefik.http.routers.dataplexity-isrdatasets.service=dataplexity-isrdatasets"
-      - "traefik.http.services.dataplexity-isrdatasets.loadbalancer.server.port=80"
-      - "traefik.http.services.dataplexity-isrdatasets.loadbalancer.responseforwarding.flushinterval=100ms"
+      - "traefik.http.routers.dataplexity-isrrepository.entrypoints=https"
+      - "traefik.http.routers.dataplexity-isrrepository.rule=Host(`isrrepository.dataplexity.eu`)"
+      - "traefik.http.routers.dataplexity-isrrepository.tls=true"
+      - "traefik.http.routers.dataplexity-isrrepository.tls.certresolver=http"
+      - "traefik.http.routers.dataplexity-isrrepository.service=dataplexity-isrrepository"
+      - "traefik.http.services.dataplexity-isrrepository.loadbalancer.server.port=80"
+      - "traefik.http.services.dataplexity-isrrepository.loadbalancer.responseforwarding.flushinterval=100ms"
       - "traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.dialtimeout=30s"
       - "traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.responseheadertimeout=3600s"
       - "traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.idleconntimeout=3600s"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.dataplexity-isrdatasets.middlewares=isr-longtimeout,default@file"
+      - "traefik.http.routers.dataplexity-isrrepository.middlewares=isr-longtimeout,default@file"
     networks:
       - proxy
       - internal

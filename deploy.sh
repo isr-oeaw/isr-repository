@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# ISR Datasets Production Deployment Script
+# ISR Repository Production Deployment Script
 # This script helps deploy the application in production
 
 set -e
 
-echo "🚀 ISR Datasets Production Deployment"
+echo "🚀 ISR Repository Production Deployment"
 echo "====================================="
 
 # Check if .env.prod exists
@@ -21,11 +21,11 @@ fi
 export $(cat .env.prod | grep -v '^#' | xargs)
 
 echo "📋 Environment Configuration:"
-echo "   Database: ${POSTGRES_DB:-isrdatasets}"
+echo "   Database: ${POSTGRES_DB:-isrrepository}"
 echo "   User: ${POSTGRES_USER:-isruser}"
 echo "   Image Registry: ${IMAGE_REGISTRY:-ghcr.io}"
 echo "   Image Namespace: ${IMAGE_NAMESPACE:-silvioheinze}"
-echo "   Image Name: ${IMAGE_NAME:-isr-datasets}"
+echo "   Image Name: ${IMAGE_NAME:-isr-repository}"
 echo "   Image Tag: ${IMAGE_TAG:-latest}"
 
 # Check if we should try to pull from registry or build locally
@@ -33,7 +33,7 @@ echo ""
 echo "🔍 Checking image availability..."
 
 # Try to pull the main image
-if docker pull "${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:-silvioheinze}/${IMAGE_NAME:-isr-datasets}:${IMAGE_TAG:-latest}" 2>/dev/null; then
+if docker pull "${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:-silvioheinze}/${IMAGE_NAME:-isr-repository}:${IMAGE_TAG:-latest}" 2>/dev/null; then
     echo "✅ Main image found in registry"
     USE_REGISTRY=true
 else
@@ -42,7 +42,7 @@ else
 fi
 
 # Try to pull the nginx image
-if docker pull "${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:-silvioheinze}/${IMAGE_NAME:-isr-datasets}-nginx:${IMAGE_TAG:-latest}" 2>/dev/null; then
+if docker pull "${IMAGE_REGISTRY:-ghcr.io}/${IMAGE_NAMESPACE:-silvioheinze}/${IMAGE_NAME:-isr-repository}-nginx:${IMAGE_TAG:-latest}" 2>/dev/null; then
     echo "✅ Nginx image found in registry"
 else
     echo "⚠️  Nginx image not found in registry, will build locally"

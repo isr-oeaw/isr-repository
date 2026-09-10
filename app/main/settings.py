@@ -27,10 +27,10 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-8igs-*5ot15+$l
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0,isrdatasets.dataplexity.eu').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0,isrrepository.dataplexity.eu').split(',')
 
 # CSRF settings
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://isrdatasets.dataplexity.eu,http://localhost:8000,http://127.0.0.1:8000').split(',')
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://isrrepository.dataplexity.eu,http://localhost:8000,http://127.0.0.1:8000').split(',')
 
 # Application definition
 
@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'user',
     'datasets',
     'projects',
+    'mcp',
 ]
 
 MIDDLEWARE = [
@@ -106,7 +107,7 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('POSTGRES_DB', 'isrdatasets'),
+            'NAME': os.environ.get('POSTGRES_DB', 'isrrepository'),
             'USER': os.environ.get('POSTGRES_USER', 'postgres'),
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres'),
             'HOST': os.environ.get('POSTGRES_HOST', 'db'),
@@ -229,7 +230,7 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 # Email settings
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@isrdatasets.dataplexity.eu')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@isrrepository.dataplexity.eu')
 SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
 
 # Email timeout settings
@@ -267,7 +268,7 @@ os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
 API_URL = ''
 
 # Site settings
-SITE_NAME = os.environ.get('SITE_NAME', 'ISR Datasets')
+SITE_NAME = os.environ.get('SITE_NAME', 'ISR Repository')
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000').rstrip('/')
 
 # Logging configuration

@@ -50,7 +50,7 @@ def test_email_configuration():
         # Send a simple test email
         logger.info(f"Sending test email from {settings.DEFAULT_FROM_EMAIL} to {test_recipient}")
         result = send_mail(
-            subject='ISR Datasets - Email Configuration Test',
+            subject='ISR Repository - Email Configuration Test',
             message='This is a test email to verify that email configuration is working correctly.',
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[test_recipient],

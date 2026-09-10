@@ -9,7 +9,7 @@ def group_memberships(request):
     }
     
     if request.user.is_authenticated:
-        # For ISR Datasets, we don't have group memberships yet
+        # For ISR Repository, we don't have group memberships yet
         # This context processor is kept for future extensibility
         # and to avoid template errors
         pass

@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-This guide explains how to deploy ISR Datasets in production using Docker Compose.
+This guide explains how to deploy ISR Repository in production using Docker Compose.
 
 ## 📋 Table of Contents
 
@@ -56,7 +56,7 @@ Create a `.env.prod` file with the following variables:
 
 ```bash
 # Database Configuration
-POSTGRES_DB=isrdatasets
+POSTGRES_DB=isrrepository
 POSTGRES_USER=isruser
 POSTGRES_PASSWORD=your_secure_password_here
 
@@ -100,7 +100,7 @@ If you have images in GitHub Container Registry:
 # Set environment variables
 export IMAGE_REGISTRY=ghcr.io
 export IMAGE_NAMESPACE=silvioheinze
-export IMAGE_NAME=isr-datasets
+export IMAGE_NAME=isr-repository
 export IMAGE_TAG=latest
 
 # Deploy
@@ -126,7 +126,7 @@ The deploy script automatically detects if registry images are available and cho
 
 The nginx service is configured with Traefik labels for automatic HTTPS:
 
-- **Domain**: `isrdatasets.dataplexity.eu`
+- **Domain**: `isrrepository.dataplexity.eu`
 - **SSL**: Automatic Let's Encrypt certificates
 - **Entry Point**: HTTPS
 
@@ -266,10 +266,10 @@ docker system df
 
 ```bash
 # Create backup
-docker compose -f docker compose.prod.yml exec db pg_dump -U isruser isrdatasets > backup.sql
+docker compose -f docker compose.prod.yml exec db pg_dump -U isruser isrrepository > backup.sql
 
 # Restore backup
-docker compose -f docker compose.prod.yml exec -T db psql -U isruser isrdatasets < backup.sql
+docker compose -f docker compose.prod.yml exec -T db psql -U isruser isrrepository < backup.sql
 ```
 
 ### Log Rotation
@@ -293,7 +293,7 @@ docker system prune -f
 
 2. **Backup database**:
    ```bash
-   docker compose -f docker compose.prod.yml exec db pg_dump -U isruser isrdatasets > backup-$(date +%Y%m%d).sql
+   docker compose -f docker compose.prod.yml exec db pg_dump -U isruser isrrepository > backup-$(date +%Y%m%d).sql
    ```
 
 3. **Update services**:
@@ -304,7 +304,7 @@ docker system prune -f
 4. **Verify deployment**:
    ```bash
    docker compose -f docker compose.prod.yml ps
-   curl -f https://isrdatasets.dataplexity.eu/
+   curl -f https://isrrepository.dataplexity.eu/
    ```
 
 ## 📁 Large File Upload Configuration
@@ -375,9 +375,9 @@ If you need to update the nginx configuration for upload limits:
 ./update-nginx.sh
 
 # Option 2: Manual update
-docker build -t isr-datasets-nginx:latest ./nginx
-docker tag isr-datasets-nginx:latest ghcr.io/silvioheinze/isr-datasets-nginx:latest
-docker push ghcr.io/silvioheinze/isr-datasets-nginx:latest
+docker build -t isr-repository-nginx:latest ./nginx
+docker tag isr-repository-nginx:latest ghcr.io/silvioheinze/isr-repository-nginx:latest
+docker push ghcr.io/silvioheinze/isr-repository-nginx:latest
 
 # Deploy to production
 docker compose -f docker-compose.prod.yml pull nginx
@@ -408,7 +408,7 @@ For uploads over several GB, ensure Traefik entrypoint `readTimeout` / `idleTime
 traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.dialtimeout=30s
 traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.responseheadertimeout=3600s
 traefik.http.middlewares.isr-longtimeout.forwardingtimeouts.idleconntimeout=3600s
-traefik.http.routers.dataplexity-isrdatasets.middlewares=isr-longtimeout,default@file
+traefik.http.routers.dataplexity-isrrepository.middlewares=isr-longtimeout,default@file
 ```
 
 ### Troubleshooting Upload Issues
@@ -461,8 +461,8 @@ EMAIL_USE_TLS=True
 EMAIL_USE_SSL=False
 EMAIL_HOST_USER=your_email@gmail.com
 EMAIL_HOST_PASSWORD=your_app_password_here
-DEFAULT_FROM_EMAIL=noreply@isrdatasets.dataplexity.eu
-SERVER_EMAIL=noreply@isrdatasets.dataplexity.eu
+DEFAULT_FROM_EMAIL=noreply@isrrepository.dataplexity.eu
+SERVER_EMAIL=noreply@isrrepository.dataplexity.eu
 ```
 
 #### 2. Deploy and Test
@@ -474,7 +474,7 @@ docker compose -f docker compose.prod.yml up -d
 # Test email configuration
 docker compose -f docker compose.prod.yml exec app python manage.py shell -c "
 from django.core.mail import send_mail
-send_mail('Test', 'Test message', 'noreply@isrdatasets.dataplexity.eu', ['your-email@example.com'])
+send_mail('Test', 'Test message', 'noreply@isrrepository.dataplexity.eu', ['your-email@example.com'])
 "
 ```
 
@@ -485,7 +485,7 @@ send_mail('Test', 'Test message', 'noreply@isrdatasets.dataplexity.eu', ['your-e
 - **Dataset Notifications**: Email alerts for dataset updates, new versions, and comments
 - **SMTP Configuration**: Production-ready email sending
 - **Security**: 1-hour password reset timeout
-- **Branding**: ISR Datasets logo and styling
+- **Branding**: ISR Repository logo and styling
 - **Multilingual**: German and English support
 - **Comprehensive Logging**: Detailed email operation logging
 

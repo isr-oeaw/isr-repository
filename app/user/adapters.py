@@ -31,5 +31,5 @@ class AccountAdapter(DefaultAccountAdapter):
                 user = User.objects.filter(email__iexact=email).first()
             if user is not None:
                 context['magic_login_url'] = build_magic_login_url(user, self.request)
-                context.setdefault('site_name', getattr(settings, 'SITE_NAME', 'ISR Datasets'))
+                context.setdefault('site_name', getattr(settings, 'SITE_NAME', 'ISR Repository'))
         return super().send_mail(template_prefix, email, context)

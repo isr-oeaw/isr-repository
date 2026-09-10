@@ -27,9 +27,9 @@ docker compose -f docker-compose.prod.yml up -d --build nginx
 
 # Option 3: Manual rebuild and push (for container registry)
 cd nginx
-docker build -t isr-datasets-nginx:latest .
-docker tag isr-datasets-nginx:latest ghcr.io/silvioheinze/isr-datasets-nginx:latest
-docker push ghcr.io/silvioheinze/isr-datasets-nginx:latest
+docker build -t isr-repository-nginx:latest .
+docker tag isr-repository-nginx:latest ghcr.io/silvioheinze/isr-repository-nginx:latest
+docker push ghcr.io/silvioheinze/isr-repository-nginx:latest
 cd ..
 docker compose -f docker-compose.prod.yml pull nginx
 docker compose -f docker-compose.prod.yml up -d nginx

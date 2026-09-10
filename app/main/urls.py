@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from mcp.views import mcp_endpoint
 from . import views
 
 urlpatterns = [
@@ -27,6 +28,8 @@ urlpatterns = [
     path('user/', include('user.urls')),
     path('datasets/', include('datasets.urls')),
     path('projects/', include('projects.urls')),
+    path('mcp/', mcp_endpoint, name='mcp'),
+    path('mcp', mcp_endpoint),
     path('logs/', views.LogView.as_view(), name='logs'),
 ]
 

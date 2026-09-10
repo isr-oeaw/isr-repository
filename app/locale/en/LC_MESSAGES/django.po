@@ -1,14 +1,14 @@
-# English translations for ISR Datasets
-# Copyright (C) 2025 ISR Datasets
-# This file is distributed under the same license as the ISR Datasets package.
+# English translations for ISR Repository
+# Copyright (C) 2025 ISR Repository
+# This file is distributed under the same license as the ISR Repository package.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: ISR Datasets 1.0\n"
+"Project-Id-Version: ISR Repository 1.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-09-13 23:33+0200\n"
 "PO-Revision-Date: 2025-09-13 23:33+0200\n"
-"Last-Translator: ISR Datasets Team\n"
+"Last-Translator: ISR Repository Team\n"
 "Language-Team: English\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
@@ -378,7 +378,7 @@ msgstr ""
 #: templates/user/login.html:4 templates/user/management.html:6
 #: templates/user/password_change.html:4 templates/user/role_list.html:6
 #: templates/user/settings.html:6
-msgid "ISR Datasets"
+msgid "ISR Repository"
 msgstr ""
 
 #: templates/account/account_inactive.html:16
@@ -512,7 +512,7 @@ msgid "Welcome Back"
 msgstr ""
 
 #: templates/account/login.html:16 templates/user/login.html:16
-msgid "Sign in to your ISR Datasets account"
+msgid "Sign in to your ISR Repository account"
 msgstr ""
 
 #: templates/account/login.html:25 templates/account/logout.html:36
@@ -1519,7 +1519,7 @@ msgid "Dashboard"
 msgstr ""
 
 #: templates/home.html:14
-msgid "Welcome to ISR Datasets"
+msgid "Welcome to ISR Repository"
 msgstr ""
 
 #: templates/home.html:17

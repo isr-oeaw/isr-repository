@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  POSTGRES_DB: isrdatasets
+  POSTGRES_DB: isrrepository
   POSTGRES_USER: isruser
   POSTGRES_PASSWORD: isrpassword
   POSTGRES_HOST: postgres
@@ -26,11 +26,11 @@ jobs:
       postgres:
         image: postgis/postgis:15-3.3
         env:
-          POSTGRES_DB: isrdatasets
+          POSTGRES_DB: isrrepository
           POSTGRES_USER: isruser
           POSTGRES_PASSWORD: isrpassword
         options: >-
-          --health-cmd="pg_isready -U isruser -d isrdatasets"
+          --health-cmd="pg_isready -U isruser -d isrrepository"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
