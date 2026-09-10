@@ -534,7 +534,6 @@ class UsersListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = get_user_model()
     context_object_name = 'users'
     template_name = 'user/list.html'
-    paginate_by = 20
 
     def test_func(self):
         # Allow access if user is superuser or has Administrator role
@@ -576,6 +575,10 @@ class UsersListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         context['search_query'] = self.request.GET.get('search', '')
         context['role_filter'] = self.request.GET.get('role', '')
         context['status_filter'] = self.request.GET.get('status', '')
+        context['total_users'] = CustomUser.objects.count()
+        context['active_users'] = CustomUser.objects.filter(is_active=True).count()
+        context['pending_users_count'] = CustomUser.objects.filter(is_approved=False).count()
+        context['total_roles'] = Role.objects.count()
         return context
 
 
@@ -769,23 +772,13 @@ class RoleDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 @login_required
 def user_management_view(request):
-    # Allow access only if user is superuser
-    if not request.user.is_superuser:
+    """Legacy URL — redirect to the user list management page."""
+    if not (
+        request.user.is_superuser
+        or (request.user.role and request.user.role.name == 'Administrator')
+    ):
         raise PermissionDenied
-    """Comprehensive user management dashboard"""
-    User = get_user_model()
-    context = {
-        'total_users': User.objects.count(),
-        'active_users': User.objects.filter(is_active=True).count(),
-        'inactive_users': User.objects.filter(is_active=False).count(),
-        'users_with_roles': User.objects.filter(role__isnull=False).count(),
-        'users_without_roles': User.objects.filter(role__isnull=True).count(),
-        'total_roles': Role.objects.count(),
-        'active_roles': Role.objects.filter(is_active=True).count(),
-        'recent_users': User.objects.select_related('role').order_by('-date_joined')[:5],
-        'recent_roles': Role.objects.order_by('-created_at')[:5],
-    }
-    return render(request, 'user/management.html', context)
+    return redirect('user-list')
 
 
 class UserProfileView(LoginRequiredMixin, TemplateView):

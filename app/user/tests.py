@@ -1201,6 +1201,23 @@ class UserViewTests(TestCase):
         self.assertNotContains(response, 'data-field="id"')
         self.assertContains(response, 'testuser')
 
+    def test_user_list_shows_management_stats(self):
+        """Test that the user list page shows management stat strip"""
+        self.client.login(username='admin', password='adminpass123')
+        response = self.client.get(reverse('user-list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'User Management')
+        self.assertContains(response, 'Total Users')
+        self.assertContains(response, 'Pending Approval')
+        self.assertContains(response, 'stat-strip')
+
+    def test_user_management_redirects_to_user_list(self):
+        """Legacy management URL should redirect to the user list"""
+        self.client.login(username='admin', password='adminpass123')
+        response = self.client.get(reverse('user-management'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('user-list'))
+
     def test_user_set_password_requires_permission(self):
         """Test that setting another user's password requires admin access"""
         self.client.login(username='testuser', password='testpass123')

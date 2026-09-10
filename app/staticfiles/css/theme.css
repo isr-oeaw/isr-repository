@@ -662,6 +662,21 @@ footer {
     padding-right: 1.25rem;
 }
 
+/* User list table */
+.user-list-search {
+    min-width: 12rem;
+    max-width: 16rem;
+    flex: 1 1 12rem;
+}
+
+.user-list-card .card-header .user-list-search .form-control {
+    margin-bottom: 0;
+}
+
+.card-body .fixed-table-pagination .pagination-detail {
+    padding-left: 1.25rem;
+}
+
 /* Featured dataset cards */
 .card.border-primary {
     border: none !important;
