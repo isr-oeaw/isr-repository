@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container">
     <!-- Profile Header -->
     <div class="row mb-4">
         <div class="col-12">
@@ -69,43 +69,22 @@
         </div>
     </div>
 
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-folder fs-1 mb-3 text-primary"></i>
-                    <h3 class="card-title">{{ user_projects.count }}</h3>
-                    <p class="card-text">{% trans "Projects" %}</p>
-                </div>
-            </div>
+    <div class="stat-strip">
+        <div class="stat-item">
+            <div class="stat-value">{{ user_projects.count }}</div>
+            <p class="stat-label">{% trans "Projects" %}</p>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-database fs-1 mb-3 text-success"></i>
-                    <h3 class="card-title">{{ user_datasets.count }}</h3>
-                    <p class="card-text">{% trans "Owned Datasets" %}</p>
-                </div>
-            </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ user_datasets.count }}</div>
+            <p class="stat-label">{% trans "Owned Datasets" %}</p>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-people fs-1 mb-3 text-info"></i>
-                    <h3 class="card-title">{{ contributed_datasets.count }}</h3>
-                    <p class="card-text">{% trans "Contributed Datasets" %}</p>
-                </div>
-            </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ contributed_datasets.count }}</div>
+            <p class="stat-label">{% trans "Contributed Datasets" %}</p>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-calendar fs-1 mb-3 text-warning"></i>
-                    <h3 class="card-title">{{ profile_user.date_joined|date:"M Y" }}</h3>
-                    <p class="card-text">{% trans "Member Since" %}</p>
-                </div>
-            </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ profile_user.date_joined|date:"M Y" }}</div>
+            <p class="stat-label">{% trans "Member Since" %}</p>
         </div>
     </div>
 
