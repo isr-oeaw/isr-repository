@@ -51,6 +51,7 @@ class NotificationEmailTests(TestCase):
             username='owner',
             email='owner@test.com',
             password='testpass123',
+            first_name='Alice',
             notify_comments=True,
             notify_dataset_updates=True,
             notify_new_versions=True
@@ -66,6 +67,7 @@ class NotificationEmailTests(TestCase):
             username='other_user',
             email='other@test.com',
             password='testpass123',
+            first_name='Bob',
             notify_dataset_updates=True,
             notify_new_versions=True
         )
@@ -125,6 +127,7 @@ class NotificationEmailTests(TestCase):
         self.assertIn('New comment on your dataset: Test Dataset', email.subject)
         self.assertIn('Test comment for notifications', email.body)
         self.assertIn('Test Site', email.body)
+        self.assertIn('/user/settings/', email.body)
 
     def test_send_comment_notification_email_disabled(self):
         """Test that comment notification is not sent when disabled"""
@@ -165,6 +168,21 @@ class NotificationEmailTests(TestCase):
             self.assertIn('Dataset updated: Test Dataset', email.subject)
             self.assertIn('Test Dataset', email.body)
             self.assertIn('Test Site', email.body)
+            self.assertIn('/user/settings/', email.body)
+
+    @patch('django.core.mail.send_mail')
+    def test_dataset_update_email_rendered_per_recipient(self, mock_send_mail):
+        """Each recipient gets HTML personalized with their first name."""
+        send_dataset_update_notification_email(self.dataset)
+
+        self.assertEqual(mock_send_mail.call_count, 2)
+        html_by_recipient = {
+            call.kwargs['recipient_list'][0]: call.kwargs['html_message']
+            for call in mock_send_mail.call_args_list
+        }
+        self.assertIn('Alice', html_by_recipient[self.owner.email])
+        self.assertIn('Bob', html_by_recipient[self.other_user.email])
+        self.assertNotIn('Bob', html_by_recipient[self.owner.email])
 
     def test_send_dataset_update_notification_email_no_users(self):
         """Test that no emails are sent when no users have notifications enabled"""
@@ -204,6 +222,47 @@ class NotificationEmailTests(TestCase):
             self.assertIn('Test Dataset', email.body)
             self.assertIn('1.0', email.body)
             self.assertIn('Test Site', email.body)
+            self.assertIn('/user/settings/', email.body)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        DEFAULT_FROM_EMAIL='noreply@test.com',
+        SITE_NAME='Test Site',
+        SITE_URL='http://test.com'
+    )
+    def test_new_version_email_shows_attachment_details(self):
+        """New version email shows attachment count when files exist without legacy file field."""
+        mail.outbox = []
+        attachment = SimpleUploadedFile('release.csv', b'col1\n1\n')
+        DatasetVersionFile.objects.create(
+            version=self.version,
+            file=attachment,
+            file_size=attachment.size,
+            original_name='release.csv',
+        )
+
+        send_new_version_notification_email(self.dataset, self.version)
+
+        self.assertGreaterEqual(len(mail.outbox), 1)
+        html_bodies = [
+            email.alternatives[0][0] if email.alternatives else email.body
+            for email in mail.outbox
+        ]
+        self.assertTrue(any('1 file' in body for body in html_bodies))
+        self.assertTrue(any('/user/settings/' in body for body in html_bodies))
+
+    @patch('django.core.mail.send_mail')
+    def test_new_version_email_rendered_per_recipient(self, mock_send_mail):
+        """Each recipient gets HTML personalized with their first name."""
+        send_new_version_notification_email(self.dataset, self.version)
+
+        self.assertEqual(mock_send_mail.call_count, 2)
+        html_by_recipient = {
+            call.kwargs['recipient_list'][0]: call.kwargs['html_message']
+            for call in mock_send_mail.call_args_list
+        }
+        self.assertIn('Alice', html_by_recipient[self.owner.email])
+        self.assertIn('Bob', html_by_recipient[self.other_user.email])
 
     def test_send_new_version_notification_email_no_users(self):
         """Test that no emails are sent when no users have notifications enabled"""

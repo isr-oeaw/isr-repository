@@ -1,34 +1,17 @@
-{% load i18n %}
-{% trans "Dataset Updated" %} - {{ site_name }}
+{% load i18n %}{% trans "Dataset Updated" %} - {{ site_name }}
 
 {% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},
 
-{% blocktrans with dataset_title=dataset.title %}The dataset "{{ dataset_title }}" has been updated.{% endblocktrans %}
+{% blocktrans with dataset_title=dataset.title %}The dataset "{{ dataset_title }}" has been updated. Review the latest metadata and files on the platform.{% endblocktrans %}
 
 {% trans "Dataset:" %} {{ dataset.title }}
-{{ dataset.description|truncatechars:150 }}
-
-{% trans "Category:" %} {{ dataset.category.name }}
+{% if dataset.description %}{{ dataset.description|truncatechars:150 }}{% endif %}
+{% if dataset.category %}{% trans "Category:" %} {{ dataset.category.name }}{% endif %}
 {% trans "Status:" %} {{ dataset.get_status_display }}
 
-{% trans "What's New:" %}
-- {% trans "Dataset information has been updated" %}
-- {% trans "Metadata and descriptions may have changed" %}
-- {% trans "Access permissions may have been modified" %}
+{% trans "View dataset:" %} {{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}
 
-{% trans "View the updated dataset:" %} {{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}
-
-{% trans "Quick Actions:" %}
-- {% trans "Review the updated dataset information" %}
-- {% trans "Check if you need to update your research" %}
-- {% trans "Download the latest version if available" %}
-
-{% trans "Thank you for following this dataset!" %}
-
-{% if not user.notify_dataset_updates %}
-{% trans "Email Notifications:" %}
-{% trans "You can manage your email notification preferences in your account settings." %}
-{% endif %}
+{% trans "Manage notification preferences:" %} {{ settings_url }}
 
 ---
 {% blocktranslate %}The {{ site_name }} team{% endblocktranslate %}
