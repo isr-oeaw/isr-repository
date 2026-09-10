@@ -200,7 +200,17 @@ ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_RATE_LIMITS = {
     'login_failed': '5/5m',
+    'request_login_code': '5/5m',
+    'confirm_login_code': '10/5m',
 }
+
+# Login by email code (Anmelde-Code) with password fallback
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True
+ACCOUNT_LOGIN_BY_CODE_REQUIRED = False
+ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 900
+ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 5
+ACCOUNT_LOGIN_BY_CODE_SUPPORTS_RESEND = True
+ACCOUNT_ADAPTER = 'user.adapters.AccountAdapter'
 
 # Email settings (for allauth and password reset)
 if DEBUG:

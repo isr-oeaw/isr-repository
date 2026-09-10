@@ -1,11 +1,12 @@
 import datetime
-from django.urls import reverse_lazy
+from urllib.parse import urlencode
+
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, TemplateView, UpdateView, ListView, FormView
 from django.views.generic.list import ListView
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login
-from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Q
@@ -22,10 +23,43 @@ from .forms import (
     UserSettingsForm, UserNotificationForm, UserProfileForm, DataExportForm, APIKeyCreateForm,
     APIKeyRevokeForm, AdminSetPasswordForm,
 )
+from django.conf import settings
+
+from allauth.account.utils import url_str_to_user_pk
+
 from .email_utils import send_account_invite_email
 from .models import Role, APIKey
+from .tokens import magic_login_token
 
 CustomUser = get_user_model()
+
+
+def magic_login(request, uidb36, token):
+    """Log in via signed magic link from login-code email."""
+    try:
+        user_pk = url_str_to_user_pk(uidb36)
+        user = CustomUser.objects.get(pk=user_pk)
+    except (CustomUser.DoesNotExist, ValueError, TypeError):
+        user = None
+
+    if user is not None and magic_login_token.check_token(user, token):
+        if not user.is_active:
+            messages.error(request, _('This account is inactive.'))
+            return redirect('account_login')
+
+        login(
+            request,
+            user,
+            backend='allauth.account.auth_backends.AuthenticationBackend',
+        )
+        messages.success(request, _('You are now signed in.'))
+        return redirect(settings.LOGIN_REDIRECT_URL)
+
+    messages.error(
+        request,
+        _('The sign-in link is invalid or has expired. Please request a new login code.'),
+    )
+    return redirect('account_login')
 
 
 def _can_manage_user_list(user):
@@ -184,14 +218,8 @@ def SettingsView(request):
         }
         return render(request, "user/settings.html", context)
     else:
-        # Process the login form for unauthenticated users
-        form = AuthenticationForm(request=request, data=request.POST or None)
-        if request.method == "POST":
-            if form.is_valid():
-                user = form.get_user()
-                login(request, user)
-                return redirect("home")
-        return render(request, "user/login.html", {"form": form})
+        query = urlencode({'next': request.get_full_path()})
+        return redirect(f"{reverse('account_login')}?{query}")
 
 
 @login_required

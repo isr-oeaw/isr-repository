@@ -5,7 +5,7 @@ from user.views import (
     UsersUpdateView, UsersListView, UserCreateView, RoleListView, RoleCreateView,
     RoleUpdateView, RoleDeleteView, user_management_view, data_export_view,
     PendingUsersView, approve_user, reject_user, UserProfileView, resend_email_verification,
-    UserSetPasswordView, disable_user_notifications,
+    UserSetPasswordView, disable_user_notifications, magic_login,
 )
 
 
@@ -39,6 +39,9 @@ urlpatterns = [
     
     # Email Verification
     path('resend-verification/', resend_email_verification, name='resend-email-verification'),
+
+    # Magic-link login (works across devices; complements allauth login-by-code)
+    path('login/magic/<str:uidb36>/<str:token>/', magic_login, name='user-magic-login'),
     
     # Allauth URLs
     path("", include("allauth.account.urls")),
