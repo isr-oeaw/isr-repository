@@ -1,0 +1,80 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  POSTGRES_DB: isrdatasets
+  POSTGRES_USER: isruser
+  POSTGRES_PASSWORD: isrpassword
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+  DEBUG: "True"
+  ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.13-slim-bookworm
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_DB: isrdatasets
+          POSTGRES_USER: isruser
+          POSTGRES_PASSWORD: isrpassword
+        options: >-
+          --health-cmd="pg_isready -U isruser -d isrdatasets"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gdal-bin \
+            libgdal-dev \
+            python3-dev \
+            gcc \
+            build-essential \
+            libpq-dev \
+            libgeos-dev \
+            proj-bin \
+            proj-data \
+            libproj-dev \
+            libxml2-dev \
+            libxslt-dev \
+            libffi-dev \
+            zlib1g-dev \
+            libjpeg-dev \
+            gettext
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.13-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.13-
+
+      - name: Install Python dependencies
+        env:
+          CPLUS_INCLUDE_PATH: /usr/include/gdal
+          C_INCLUDE_PATH: /usr/include/gdal
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        working-directory: app
+        run: python manage.py test --noinput --verbosity=1
