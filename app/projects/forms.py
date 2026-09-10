@@ -199,3 +199,25 @@ class ProjectFilterForm(forms.Form):
         }),
         label=_('Status')
     )
+
+
+class ProjectPartnerInviteForm(forms.Form):
+    """Invite an external partner to collaborate on a project."""
+
+    email = forms.EmailField(
+        label=_('Email'),
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': _('partner@example.com'),
+        }),
+    )
+    first_name = forms.CharField(
+        label=_('First name'),
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    last_name = forms.CharField(
+        label=_('Last name'),
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )

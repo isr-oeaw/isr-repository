@@ -1,6 +1,6 @@
 {% load i18n %}{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},
 
-{% blocktrans %}An administrator has created an account for you on {{ site_name }}. Please set your password using the link below before signing in.{% endblocktrans %}
+{% if project %}{% blocktrans with project_title=project.title %}You have been invited to collaborate on the project "{{ project_title }}" on {{ site_name }}. Sign in with your email using the login page below.{% endblocktrans %}{% else %}{% blocktrans %}An administrator has created an account for you on {{ site_name }}. Sign in with your email using the login page below.{% endblocktrans %}{% endif %}
 
 {% trans "Your account details" %}:
 {% trans "Username" %}: {{ username }}
@@ -8,8 +8,8 @@
 {% if role_name %}{% trans "Role" %}: {{ role_name }}
 {% endif %}{% trans "Login page" %}: {{ login_url }}
 
-{% trans "Set your password" %}: {{ password_set_url }}
+{% trans "On the login page, enter your email address to receive a sign-in code or magic link. You can also sign in with a password if you have set one." %}
 
-{% trans "Important: You will not be able to sign in until you have set your password using the link above." %}
+{% trans "Optional: If you prefer to use a password, set one here" %}: {{ password_set_url }}
 
 {% trans "This is an automated message, please do not reply to this email." %}

@@ -27,7 +27,7 @@ def build_password_set_url(user, request=None):
     return f'{site_url}{path}'
 
 
-def send_account_invite_email(user, request=None):
+def send_account_invite_email(user, request=None, project=None):
     """Send a welcome email with login details and a link to set the password."""
     password_set_url = build_password_set_url(user, request=request)
     site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000').rstrip('/')
@@ -43,6 +43,7 @@ def send_account_invite_email(user, request=None):
         'site_url': site_url,
         'login_url': login_url,
         'password_set_url': password_set_url,
+        'project': project,
     }
 
     subject = _('Your %(site_name)s account has been created') % {'site_name': site_name}

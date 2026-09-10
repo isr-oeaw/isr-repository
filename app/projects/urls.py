@@ -11,4 +11,5 @@ urlpatterns = [
     path('<int:pk>/edit/', views.ProjectUpdateView.as_view(), name='project_edit'),
     path('<int:pk>/delete/', views.ProjectDeleteView.as_view(), name='project_delete'),
     path('<int:pk>/transfer-ownership/', views.ProjectTransferOwnershipView.as_view(), name='project_transfer_ownership'),
+    path('<int:pk>/invite-partner/', views.invite_project_partner, name='project_invite_partner'),
 ]

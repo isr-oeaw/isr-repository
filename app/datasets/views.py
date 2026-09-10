@@ -26,6 +26,7 @@ from .models import (
 )
 from .forms import DatasetForm, DatasetFilterForm, DatasetVersionForm, DatasetCategoryForm, DatasetCategoryFilterForm, CommentForm, CommentEditForm, PublisherForm, PublisherFilterForm, DatasetProjectAssignmentForm, DatasetAnalysisForm
 from .chunk_uploads import append_chunk, remove_chunk_upload
+from user.access import partner_visible_datasets, user_can_access_dataset
 
 
 def user_can_manage_dataset_versions(user, dataset):
@@ -144,8 +145,15 @@ class DatasetListView(LoginRequiredMixin, ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        # All authenticated users can see all datasets regardless of status
-        queryset = Dataset.objects.all().select_related('owner', 'category').prefetch_related('contributors', 'versions', 'versions__files')
+        if self.request.user.is_external_partner:
+            queryset = partner_visible_datasets(self.request.user).select_related(
+                'owner', 'category'
+            ).prefetch_related('contributors', 'versions', 'versions__files')
+        else:
+            # All authenticated users can see all datasets regardless of status
+            queryset = Dataset.objects.all().select_related(
+                'owner', 'category'
+            ).prefetch_related('contributors', 'versions', 'versions__files')
         
         # Filter by category
         category = self.request.GET.get('category')
@@ -213,6 +221,13 @@ class DatasetDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'dataset'
 
     def get_queryset(self):
+        if self.request.user.is_external_partner:
+            return partner_visible_datasets(self.request.user).select_related(
+                'owner', 'category', 'publisher'
+            ).prefetch_related(
+                'contributors', 'versions', 'versions__files',
+                'related_datasets', 'comments__author', 'projects',
+            )
         # All authenticated users can see all datasets regardless of status
         return Dataset.objects.select_related('owner', 'category', 'publisher').prefetch_related(
             'contributors', 'versions', 'versions__files', 'related_datasets', 'comments__author', 'projects'
@@ -220,6 +235,9 @@ class DatasetDetailView(LoginRequiredMixin, DetailView):
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
+
+        if not user_can_access_dataset(self.request.user, obj):
+            raise Http404("Dataset not found or access denied")
         
         # Increment view count for authenticated users
         obj.view_count += 1
@@ -232,7 +250,11 @@ class DatasetDetailView(LoginRequiredMixin, DetailView):
         dataset = self.get_object()
         
         # Add related datasets to context (from model relationship)
-        context['related_datasets'] = dataset.related_datasets.all().select_related('owner', 'category')[:8]
+        related_datasets = dataset.related_datasets.all().select_related('owner', 'category')
+        if self.request.user.is_external_partner:
+            visible_pks = partner_visible_datasets(self.request.user).values_list('pk', flat=True)
+            related_datasets = related_datasets.filter(pk__in=visible_pks)
+        context['related_datasets'] = related_datasets[:8]
         
         context['can_edit'] = (
             self.request.user == dataset.owner or 
@@ -350,7 +372,8 @@ def dataset_download(request, pk, latest=False):
                 # Web request - redirect to login
                 return redirect_to_login(request.get_full_path())
     
-    # All authenticated users can download all datasets regardless of status
+    if not user_can_access_dataset(request.user, dataset):
+        raise Http404("Dataset not found or access denied")
     
     version_id = request.GET.get('version')
     version = None
