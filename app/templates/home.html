@@ -4,147 +4,111 @@
 {% block title %}{% trans "Dashboard" %} - {{ SITE_NAME }}{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <!-- Welcome Section -->
-    <div class="row mb-5">
-        <div class="col-12">
-            <div class="text-center">
-                <h1 class="display-4 fw-bold text-primary mb-3">
-                    <i class="bi bi-database-fill me-3"></i>
-                    {% blocktrans %}Welcome to {{ SITE_NAME }}{% endblocktrans %}
-                </h1>
-                <p class="lead text-muted">
-                    {% trans "A comprehensive platform for managing, accessing, and analyzing research datasets" %}
-                </p>
-            </div>
+<div class="container">
+    <div class="dashboard-hero">
+        <h1>
+            {% blocktrans %}Welcome to {{ SITE_NAME }}{% endblocktrans %}
+        </h1>
+        <p class="lead mb-0">
+            {% trans "A comprehensive platform for managing, accessing, and analyzing research datasets" %}
+        </p>
+    </div>
+
+    <div class="stat-strip">
+        <div class="stat-item">
+            <div class="stat-value">{{ total_datasets|default:0 }}</div>
+            <p class="stat-label">{% trans "Published Datasets" %}</p>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ data_volume_display|default:"0KB" }}</div>
+            <p class="stat-label">{% trans "Data Volume" %}</p>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ total_users|default:0 }}</div>
+            <p class="stat-label">{% trans "Active Users" %}</p>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ total_projects|default:0 }}</div>
+            <p class="stat-label">{% trans "Active Projects" %}</p>
         </div>
     </div>
 
-    <!-- Quick Stats Cards -->
-    <div class="row mb-5">
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-collection fs-1 mb-3 text-primary"></i>
-                    <h3 class="card-title">{{ total_datasets|default:0 }}</h3>
-                    <p class="card-text">{% trans "Published Datasets" %}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-download fs-1 mb-3 text-success"></i>
-                    <h3 class="card-title">{{ data_volume_display|default:"0KB" }}</h3>
-                    <p class="card-text">{% trans "Data Volume" %}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-people fs-1 mb-3 text-info"></i>
-                    <h3 class="card-title">{{ total_users|default:0 }}</h3>
-                    <p class="card-text">{% trans "Active Users" %}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card stats-card h-100">
-                <div class="card-body text-center">
-                    <i class="bi bi-folder fs-1 mb-3 text-warning"></i>
-                    <h3 class="card-title">{{ total_projects|default:0 }}</h3>
-                    <p class="card-text">{% trans "Active Projects" %}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Help Section (shown only for 7 days after first login) -->
     {% if show_help_section %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="text-center">
-                <div class="alert alert-info border-0 shadow-sm">
-                    <div class="d-flex align-items-center justify-content-center">
-                        <i class="bi bi-question-circle-fill me-3 fs-4"></i>
-                        <div>
-                            <strong>{% trans "Need help getting started?" %}</strong>
-                            <p class="mb-0">{% trans "Check out our comprehensive documentation for guides and tutorials." %}</p>
-                        </div>
-                        <a href="{% url 'documentation' %}" class="btn btn-outline-primary ms-3">
-                            <i class="bi bi-book me-2"></i>
-                            {% trans "View Documentation" %}
-                        </a>
-                    </div>
+    <div class="mb-4">
+        <div class="alert alert-info">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <i class="bi bi-question-circle-fill fs-4"></i>
+                <div class="flex-grow-1">
+                    <strong>{% trans "Need help getting started?" %}</strong>
+                    <p class="mb-0">{% trans "Check out our comprehensive documentation for guides and tutorials." %}</p>
                 </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Announcements Section -->
-    {% if active_announcements %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="mb-0">
-                    <i class="bi bi-megaphone me-2"></i>
-                    {% trans "Announcements" %}
-                </h4>
-                {% if user.is_superuser or user.has_role_permission|default:False %}
-                <a href="{% url 'announcement-management' %}" class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-gear me-1"></i>
-                    {% trans "Manage Announcements" %}
+                <a href="{% url 'documentation' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-book me-2"></i>
+                    {% trans "View Documentation" %}
                 </a>
-                {% endif %}
             </div>
-            {% for announcement in active_announcements %}
-            <div class="alert alert-{{ announcement.get_priority_class }} border-0 shadow-sm mb-3">
-                <div class="d-flex align-items-start">
-                    <div class="flex-shrink-0 me-3">
-                        {% if announcement.priority == 'urgent' %}
-                            <i class="bi bi-exclamation-triangle-fill fs-4"></i>
-                        {% elif announcement.priority == 'high' %}
-                            <i class="bi bi-exclamation-circle-fill fs-4"></i>
-                        {% elif announcement.priority == 'normal' %}
-                            <i class="bi bi-info-circle-fill fs-4"></i>
-                        {% else %}
-                            <i class="bi bi-info-circle fs-4"></i>
-                        {% endif %}
-                    </div>
-                    <div class="flex-grow-1">
-                        <h5 class="alert-heading mb-2">
-                            {{ announcement.title }}
-                            {% if announcement.priority == 'urgent' %}
-                                <span class="badge bg-danger ms-2">{% trans "URGENT" %}</span>
-                            {% elif announcement.priority == 'high' %}
-                                <span class="badge bg-warning ms-2">{% trans "HIGH" %}</span>
-                            {% endif %}
-                        </h5>
-                        <p class="mb-2">{{ announcement.message|linebreaks }}</p>
-                        <small class="text-muted">
-                            <i class="bi bi-person me-1"></i>
-                            {% trans "Posted by" %} {{ announcement.created_by.get_full_name|default:announcement.created_by.username }}
-                            <i class="bi bi-calendar me-1 ms-2"></i>
-                            {{ announcement.created_at|date:"M d, Y" }}
-                            {% if announcement.valid_until %}
-                                <i class="bi bi-clock me-1 ms-2"></i>
-                                {% trans "Valid until" %} {{ announcement.valid_until|date:"M d, Y" }}
-                            {% endif %}
-                        </small>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
         </div>
     </div>
     {% endif %}
 
-    <!-- Recent Activity & Popular Datasets -->
-    <div class="row">
+    {% if active_announcements %}
+    <div class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="section-title">
+                <i class="bi bi-megaphone me-2"></i>
+                {% trans "Announcements" %}
+            </h2>
+            {% if user.is_superuser or user.has_role_permission|default:False %}
+            <a href="{% url 'announcement-management' %}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-gear me-1"></i>
+                {% trans "Manage Announcements" %}
+            </a>
+            {% endif %}
+        </div>
+        {% for announcement in active_announcements %}
+        <div class="alert alert-{{ announcement.get_priority_class }} mb-3">
+            <div class="d-flex align-items-start">
+                <div class="flex-shrink-0 me-3">
+                    {% if announcement.priority == 'urgent' %}
+                        <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                    {% elif announcement.priority == 'high' %}
+                        <i class="bi bi-exclamation-circle-fill fs-4"></i>
+                    {% elif announcement.priority == 'normal' %}
+                        <i class="bi bi-info-circle-fill fs-4"></i>
+                    {% else %}
+                        <i class="bi bi-info-circle fs-4"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="alert-heading mb-2">
+                        {{ announcement.title }}
+                        {% if announcement.priority == 'urgent' %}
+                            <span class="badge bg-danger ms-2">{% trans "URGENT" %}</span>
+                        {% elif announcement.priority == 'high' %}
+                            <span class="badge bg-warning ms-2">{% trans "HIGH" %}</span>
+                        {% endif %}
+                    </h5>
+                    <p class="mb-2">{{ announcement.message|linebreaks }}</p>
+                    <small class="text-muted">
+                        <i class="bi bi-person me-1"></i>
+                        {% trans "Posted by" %} {{ announcement.created_by.get_full_name|default:announcement.created_by.username }}
+                        <i class="bi bi-calendar me-1 ms-2"></i>
+                        {{ announcement.created_at|date:"M d, Y" }}
+                        {% if announcement.valid_until %}
+                            <i class="bi bi-clock me-1 ms-2"></i>
+                            {% trans "Valid until" %} {{ announcement.valid_until|date:"M d, Y" }}
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
         <div class="col-md-8">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-clock-history me-2"></i>
@@ -179,9 +143,9 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div class="text-center py-4">
-                            <i class="bi bi-clock-history fs-1 text-muted mb-3"></i>
-                            <p class="text-muted">{% trans "No recent activity found" %}</p>
+                        <div class="empty-state">
+                            <i class="bi bi-clock-history d-block"></i>
+                            <p class="mb-3">{% trans "No recent activity found" %}</p>
                             <a href="{% url 'datasets:dataset_create' %}" class="btn btn-primary btn-sm">
                                 <i class="bi bi-plus-circle me-2"></i>
                                 {% trans "Add First Dataset" %}
@@ -192,7 +156,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-star me-2"></i>
@@ -215,9 +179,9 @@
                             {% endfor %}
                         </div>
                     {% else %}
-                        <div class="text-center py-4">
-                            <i class="bi bi-star fs-1 text-muted mb-3"></i>
-                            <p class="text-muted">{% trans "No datasets available yet" %}</p>
+                        <div class="empty-state">
+                            <i class="bi bi-star d-block"></i>
+                            <p class="mb-0">{% trans "No datasets available yet" %}</p>
                         </div>
                     {% endif %}
                 </div>
@@ -225,12 +189,11 @@
         </div>
     </div>
 
-    <!-- Categories Overview & User's Datasets -->
     {% if categories_with_counts or user_datasets %}
-    <div class="row mt-4">
+    <div class="row g-4 mt-1">
         {% if categories_with_counts %}
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-tags me-2"></i>
@@ -250,7 +213,7 @@
                         </div>
                         {% endfor %}
                     </div>
-                    <div class="text-center mt-3">
+                    <div class="text-center mt-2">
                         <a href="{% url 'datasets:category_list' %}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-tags me-2"></i>
                             {% trans "View All Categories" %}
@@ -260,10 +223,10 @@
             </div>
         </div>
         {% endif %}
-        
+
         {% if user_datasets %}
         <div class="col-md-6">
-            <div class="card">
+            <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0">
                         <i class="bi bi-person-circle me-2"></i>

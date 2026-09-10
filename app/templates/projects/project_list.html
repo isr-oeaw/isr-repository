@@ -6,34 +6,28 @@
 {% block title %}{% trans "Projects" %} - {{ SITE_NAME }}{% endblock title %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h2 mb-1">
-                        <i class="bi bi-folder me-2"></i>
-                        {% trans "Research Projects" %}
-                    </h1>
-                    <p class="text-muted">{% trans "Manage and explore research projects and their associated datasets" %}</p>
-                </div>
-                <div>
-                    {% if user.is_superuser or user.role.name == 'Editor' or user.role.name == 'Administrator' %}
-                        <a href="{% url 'projects:project_create' %}" class="btn btn-primary">
-                            <i class="bi bi-plus-circle me-2"></i>
-                            {% trans "Add Project" %}
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
+<div class="container">
+    <div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-folder me-2"></i>
+                {% trans "Research Projects" %}
+            </h1>
+            <p class="page-subtitle">{% trans "Manage and explore research projects and their associated datasets" %}</p>
+        </div>
+        <div class="page-actions">
+            {% if user.is_superuser or user.role.name == 'Editor' or user.role.name == 'Administrator' %}
+                <a href="{% url 'projects:project_create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    {% trans "Add Project" %}
+                </a>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Filters -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
+            <div class="card filter-panel">
                 <div class="card-body">
                     <form method="get" class="row g-3">
                         <div class="col-md-4">

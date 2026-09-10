@@ -3109,3 +3109,39 @@ class LoginByCodeTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertIn(str(self.user.pk), self.client.session.get('_auth_user_id', ''))
+
+    def test_password_login_smtp_failure_does_not_500(self):
+        from smtplib import SMTPAuthenticationError
+        from unittest.mock import patch
+
+        from allauth.account.models import EmailAddress
+
+        unverified = self.User.objects.create_user(
+            username='unverifieduser',
+            email='unverified@example.com',
+            password='testpass123',
+            is_approved=True,
+        )
+        EmailAddress.objects.create(
+            user=unverified,
+            email=unverified.email,
+            primary=True,
+            verified=False,
+        )
+
+        with patch(
+            'django.core.mail.message.EmailMessage.send',
+            side_effect=SMTPAuthenticationError(535, b'BadCredentials'),
+        ):
+            response = self.client.post(
+                f"{reverse('account_login')}?password=1",
+                {
+                    'login': unverified.email,
+                    'password': 'testpass123',
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'could not send an email')
+        self.assertNotIn(str(unverified.pk), self.client.session.get('_auth_user_id', ''))

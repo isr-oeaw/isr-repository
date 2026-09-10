@@ -4,17 +4,14 @@
 {% block title %}{% trans "Datasets" %} - {{ SITE_NAME }}{% endblock title %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h2 mb-1">{% trans "Research Datasets" %}</h1>
-                    <p class="text-muted">{% trans "Discover and access research datasets" %}</p>
-                </div>
-                {% if user.is_authenticated %}
-                <div>
+<div class="container">
+    <div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="page-title">{% trans "Research Datasets" %}</h1>
+            <p class="page-subtitle">{% trans "Discover and access research datasets" %}</p>
+        </div>
+        {% if user.is_authenticated %}
+        <div class="page-actions">
                     {% if user.is_superuser or user.role.name == 'Editor' or user.role.name == 'Administrator' %}
                         <a href="{% url 'datasets:dataset_create' %}" class="btn btn-primary">
                             <i class="bi bi-plus-circle me-2"></i>
@@ -31,16 +28,13 @@
                         {% trans "Manage Publishers" %}
                     </a>
                     {% endif %}
-                </div>
-                {% endif %}
-            </div>
         </div>
+        {% endif %}
     </div>
 
-    <!-- Search and Filter Section -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
+            <div class="card filter-panel">
                 <div class="card-body">
                     <form method="get" class="row g-3">
                         <div class="col-md-4">
