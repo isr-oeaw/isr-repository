@@ -1060,11 +1060,10 @@ class UserViewTests(TestCase):
         self.assertTrue(user.is_approved)  # Auto-approved by admin
     
     def test_settings_view_anonymous_user(self):
-        """Test settings view for anonymous user"""
+        """Test settings view for anonymous user redirects to login"""
         response = self.client.get(reverse('user-settings'))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'user/login.html')
-        self.assertContains(response, 'Login')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user/login/', response.url)
     
     def test_settings_view_authenticated_user(self):
         """Test settings view for authenticated user"""
@@ -2998,3 +2997,115 @@ class APIKeyDatasetDownloadTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/octet-stream')
         self.assertIn('attachment', response['Content-Disposition'])
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class LoginByCodeTests(TestCase):
+    """Tests for magic-link and Anmelde-Code login."""
+
+    def setUp(self):
+        from django.core import mail
+        from allauth.account.models import EmailAddress
+
+        mail.outbox.clear()
+        self.User = get_user_model()
+        self.user = self.User.objects.create_user(
+            username='codeuser',
+            email='codeuser@example.com',
+            password='testpass123',
+            is_approved=True,
+        )
+        EmailAddress.objects.create(
+            user=self.user,
+            email=self.user.email,
+            primary=True,
+            verified=True,
+        )
+        self.client = Client()
+
+    @staticmethod
+    def _extract_login_code(message):
+        import re
+
+        text = message.body
+        for content, mimetype in getattr(message, 'alternatives', []):
+            if mimetype == 'text/html':
+                text += f'\n{content}'
+        match = re.search(r'>([A-Za-z0-9-]{4,12})<', text)
+        if match:
+            return match.group(1)
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped and re.fullmatch(r'[A-Za-z0-9-]{4,12}', stripped):
+                return stripped
+        return None
+
+    def test_login_page_shows_code_cta_by_default(self):
+        response = self.client.get(reverse('account_login'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Email me a login code')
+        self.assertNotContains(response, 'Sign In with Password')
+
+    def test_login_page_password_fallback(self):
+        response = self.client.get(reverse('account_login'), {'password': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sign In with Password')
+
+    def test_request_login_code_sends_email_with_code_and_magic_link(self):
+        from django.core import mail
+
+        response = self.client.post(
+            reverse('account_request_login_code'),
+            {'email': self.user.email},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertIn(self.user.email, message.to)
+        self.assertIsNotNone(self._extract_login_code(message))
+        body = message.body
+        if message.alternatives:
+            body += message.alternatives[0][0]
+        self.assertIn('/user/login/magic/', body)
+
+    def test_confirm_login_code_logs_in(self):
+        from django.core import mail
+
+        self.client.post(
+            reverse('account_request_login_code'),
+            {'email': self.user.email},
+        )
+        code = self._extract_login_code(mail.outbox[0])
+        self.assertIsNotNone(code)
+
+        response = self.client.post(
+            reverse('account_confirm_login_code'),
+            {'code': code},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(str(self.user.pk), self.client.session.get('_auth_user_id', ''))
+
+    def test_magic_link_login_and_rejects_reuse(self):
+        from urllib.parse import urlparse
+
+        from user.adapters import build_magic_login_url
+
+        login_path = urlparse(build_magic_login_url(self.user)).path
+        response = self.client.get(login_path)
+        self.assertEqual(response.status_code, 302)
+
+        self.client.logout()
+        response = self.client.get(login_path)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/user/login/', response.url)
+
+    def test_password_fallback_still_logs_in(self):
+        response = self.client.post(
+            f"{reverse('account_login')}?password=1",
+            {
+                'login': self.user.email,
+                'password': 'testpass123',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(str(self.user.pk), self.client.session.get('_auth_user_id', ''))

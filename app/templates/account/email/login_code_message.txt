@@ -1,0 +1,17 @@
+{% load i18n %}{% autoescape off %}{% blocktrans with site_name=site_name|default:"ISR Datasets" %}Hello,
+
+You requested to sign in to {{ site_name }}.
+
+Your sign-in code (Anmelde-Code) is:
+
+{{ code }}
+
+This code expires in 15 minutes.
+
+You can also sign in by opening this link in your browser:
+{{ magic_login_url }}
+
+If you did not request this email, you can safely ignore it.
+
+{{ site_name }}
+{% endblocktrans %}{% endautoescape %}
