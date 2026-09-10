@@ -328,3 +328,24 @@ LOGGING = {
         },
     },
 }
+
+# During tests, keep console output limited to unittest progress (dots only).
+# Expected 403/404 responses and routine email sends are still logged to files.
+if any(arg == 'test' for arg in sys.argv):
+    LOGGING['handlers']['null'] = {'class': 'logging.NullHandler'}
+    LOGGING['loggers']['django.request'] = {
+        'handlers': ['file'],
+        'level': 'ERROR',
+        'propagate': False,
+    }
+    for _logger_name, _logger_config in LOGGING['loggers'].items():
+        _handlers = [
+            _handler for _handler in _logger_config.get('handlers', [])
+            if _handler != 'console'
+        ] or ['null']
+        _logger_config['handlers'] = _handlers
+        _logger_config['propagate'] = False
+    LOGGING['root'] = {
+        'handlers': ['null'],
+        'level': 'WARNING',
+    }

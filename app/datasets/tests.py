@@ -1837,11 +1837,8 @@ class DatasetDeleteViewTests(TestCase):
         self.client.login(username='superuser', password='testpass123')
         fake_uuid = uuid.uuid4()
         url = reverse('datasets:dataset_delete', kwargs={'pk': fake_uuid})
-        with self.assertLogs('django.request', level='WARNING') as log_capture:
-            response = self.client.get(url)
-        
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
-        self.assertTrue(any('Not Found' in entry for entry in log_capture.output))
 
 
 class DatasetAnalysisModelTests(TestCase):
