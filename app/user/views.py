@@ -501,9 +501,11 @@ class UserSetPasswordView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
 
 @login_required
-@user_passes_test(_can_manage_user_list)
 def disable_user_notifications(request, user_id):
     """Disable all email notification preferences for a user."""
+    if not _can_manage_user_list(request.user):
+        raise PermissionDenied
+
     target_user = get_object_or_404(CustomUser, id=user_id)
 
     if request.method == 'POST':

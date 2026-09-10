@@ -6,16 +6,15 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
-from allauth.account.adapter import get_adapter
 from allauth.account.utils import user_pk_to_url_str
+from django.contrib.auth.tokens import default_token_generator
 
 logger = logging.getLogger(__name__)
 
 
 def build_password_set_url(user, request=None):
     """Build an allauth password-set URL for a newly invited user."""
-    adapter = get_adapter()
-    token = adapter.get_token_generator().make_token(user)
+    token = default_token_generator.make_token(user)
     uid = user_pk_to_url_str(user)
     path = reverse(
         'account_reset_password_from_key',

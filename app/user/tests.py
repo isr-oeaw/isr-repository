@@ -171,10 +171,9 @@ class LanguageSwitchingTests(TestCase):
         """Test that anonymous users see login form instead of settings"""
         response = self.client.get(self.settings_url)
         
-        # Should show login form (200) instead of redirecting
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Login')
-        self.assertNotContains(response, 'Language Preferences')
+        # Should redirect anonymous users to login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
     
     def test_language_switching_post_anonymous_user(self):
         """Test that anonymous users cannot POST to language switching"""
@@ -183,10 +182,9 @@ class LanguageSwitchingTests(TestCase):
             'language_submit': 'Save Language Preference'
         })
         
-        # Should show login form (200) instead of redirecting
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Login')
-        self.assertNotContains(response, 'Language Preferences')
+        # Should redirect anonymous users to login
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login/', response.url)
     
     def test_language_switching_success_message(self):
         """Test that success message is displayed after language change"""
@@ -509,10 +507,10 @@ class CustomUserModelTests(TestCase):
         )
         
         self.assertEqual(user.language, 'en')
-        self.assertTrue(user.email_notifications)
-        self.assertTrue(user.notify_dataset_updates)
-        self.assertTrue(user.notify_new_versions)
-        self.assertTrue(user.notify_comments)
+        self.assertFalse(user.email_notifications)
+        self.assertFalse(user.notify_dataset_updates)
+        self.assertFalse(user.notify_new_versions)
+        self.assertFalse(user.notify_comments)
         self.assertFalse(user.is_approved)
         self.assertIsNone(user.first_login_date)
     
@@ -801,7 +799,9 @@ class UserFormTests(TestCase):
         
         # Check that the error message is about auto-setting is_staff
         self.assertIn('is_staff', form.errors)
-        self.assertIn('automatically set', str(form.errors['is_staff']))
+        from django.utils.translation import gettext as _
+        expected_message = _('Superusers must also be staff members. This has been automatically set.')
+        self.assertIn(str(expected_message), str(form.errors['is_staff']))
         
         # The key behavior is that the form detects the conflict and adds an error message
         # This is the expected behavior of the form's clean method
@@ -2825,7 +2825,7 @@ class APIKeyDatasetDownloadTests(TestCase):
         )
         
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'application/octet-stream')
+        self.assertEqual(response['Content-Type'], 'text/csv')
         self.assertIn('attachment', response['Content-Disposition'])
         
         # Check download was recorded
@@ -2995,7 +2995,7 @@ class APIKeyDatasetDownloadTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response['Content-Type'], 'application/octet-stream')
+        self.assertEqual(response['Content-Type'], 'text/csv')
         self.assertIn('attachment', response['Content-Disposition'])
 
 

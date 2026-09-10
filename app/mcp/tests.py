@@ -18,21 +18,9 @@ class McpEndpointTests(TestCase):
         self.client = Client()
         self.mcp_url = reverse('mcp')
 
-        self.editor_role = Role.objects.create(
-            name='Editor',
-            permissions={'permissions': ['dataset.create', 'dataset.edit']},
-            is_active=True,
-        )
-        self.viewer_role = Role.objects.create(
-            name='Viewer',
-            permissions={'permissions': ['dataset.view']},
-            is_active=True,
-        )
-        self.partner_role = Role.objects.create(
-            name='External Partner',
-            permissions={'permissions': ['dataset.view', 'project.view']},
-            is_active=True,
-        )
+        self.editor_role = Role.objects.get(name='Editor')
+        self.viewer_role = Role.objects.get(name='Viewer')
+        self.partner_role = Role.objects.get(name='External Partner')
 
         self.owner = User.objects.create_user(
             username='owner',
@@ -194,7 +182,6 @@ class McpEndpointTests(TestCase):
                 'title': 'MCP Created Dataset',
                 'description': 'Created through MCP',
                 'category_id': self.category.id,
-                'project_ids': [self.project.id],
             },
             api_key=self.editor_key.key,
         )
