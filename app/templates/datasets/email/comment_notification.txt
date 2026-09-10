@@ -1,29 +1,19 @@
-{% load i18n %}
-{% trans "New Comment on Your Dataset" %} - {{ site_name }}
+{% load i18n %}{% trans "New Comment on Your Dataset" %} - {{ site_name }}
 
 {% trans "Hello" %}{% if owner.first_name %}, {{ owner.first_name }}{% endif %},
 
-{% blocktrans with commenter=commenter.get_full_name|default:commenter.username %}You have received a new comment on your dataset from {{ commenter }}.{% endblocktrans %}
+{% blocktrans with commenter=commenter.get_full_name|default:commenter.username %}{{ commenter }} left a new comment on your dataset.{% endblocktrans %}
 
 {% trans "Dataset:" %} {{ dataset.title }}
-{{ dataset.description|truncatechars:150 }}
+{% if dataset.description %}{{ dataset.description|truncatechars:150 }}{% endif %}
+{% if dataset.category %}{% trans "Category:" %} {{ dataset.category.name }}{% endif %}
 
 {% trans "Comment by" %} {{ commenter.get_full_name|default:commenter.username }} ({{ comment.created_at|date:"F d, Y \a\t g:i A" }}):
-"{{ comment.content|truncatechars:200 }}{% if comment.content|length > 200 %}...{% endif %}"
+"{{ comment.content|truncatechars:300 }}{% if comment.content|length > 300 %}...{% endif %}"
 
-{% trans "View the full comment and dataset:" %} {{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}
+{% trans "View comment:" %} {{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}
 
-{% trans "Quick Actions:" %}
-- {% trans "Reply to the comment directly on the dataset page" %}
-- {% trans "Share your dataset with others" %}
-- {% trans "Update your dataset information if needed" %}
-
-{% trans "Thank you for sharing your dataset with the community!" %}
-
-{% if not owner.email_notifications %}
-{% trans "Email Notifications:" %}
-{% trans "You can manage your email notification preferences in your account settings." %}
-{% endif %}
+{% trans "Manage notification preferences:" %} {{ settings_url }}
 
 ---
 {% blocktranslate %}The {{ site_name }} team{% endblocktranslate %}

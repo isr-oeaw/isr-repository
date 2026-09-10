@@ -21,35 +21,31 @@
 {% block content %}
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if owner.first_name %}, {{ owner.first_name }}{% endif %},</p>
 
-<p style="margin: 0 0 24px 0;">{% blocktrans with commenter=commenter.get_full_name|default:commenter.username %}You have received a new comment on your dataset from {{ commenter }}.{% endblocktrans %}</p>
+<p style="margin: 0 0 24px 0;">{% blocktrans with commenter=commenter.get_full_name|default:commenter.username %}<strong>{{ commenter }}</strong> left a new comment on your dataset.{% endblocktrans %}</p>
 
 <div class="card" style="border-left: 4px solid #92C1E9;">
     <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #001A70;">{{ dataset.title }}</h3>
-    <p class="meta" style="margin: 0;">{{ dataset.description|truncatechars:150 }}</p>
+    {% if dataset.description %}
+    <p class="meta" style="margin: 0 0 12px 0;">{{ dataset.description|truncatechars:150 }}</p>
+    {% endif %}
+    {% if dataset.category %}
+    <p style="margin: 0;">
+        <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#1A1A1A{% else %}#FFFFFF{% endif %}; padding: 4px 10px; border-radius: 4px; font-size: 13px;">
+            {{ dataset.category.name }}
+        </span>
+    </p>
+    {% endif %}
 </div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 20px 0; background-color: #FFFFFF; border: 1px solid #D6E4F5; border-left: 4px solid #92C1E9; border-radius: 0 4px 4px 0;">
     <tr>
         <td style="padding: 20px;">
-            <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                    <td valign="top" style="padding-right: 16px;">
-                        <table role="presentation" cellpadding="0" cellspacing="0">
-                            <tr>
-                                <td width="40" height="40" align="center" valign="middle" style="width: 40px; height: 40px; background-color: #001A70; color: #FFFFFF; font-weight: 700; font-size: 16px; border-radius: 4px;">
-                                    {{ commenter.get_full_name|default:commenter.username|first|upper }}
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                    <td valign="top">
-                        <strong style="color: #1A1A1A;">{{ commenter.get_full_name|default:commenter.username }}</strong><br>
-                        <span class="meta">{{ comment.created_at|date:"F d, Y \a\t g:i A" }}</span>
-                    </td>
-                </tr>
-            </table>
-            <p style="margin: 16px 0 0 0; font-style: italic; color: #555555;">
-                &ldquo;{{ comment.content|truncatechars:200 }}{% if comment.content|length > 200 %}&hellip;{% endif %}&rdquo;
+            <p style="margin: 0 0 8px 0; font-size: 14px; color: #555555;">
+                <strong style="color: #1A1A1A;">{{ commenter.get_full_name|default:commenter.username }}</strong>
+                · {{ comment.created_at|date:"F d, Y \a\t g:i A" }}
+            </p>
+            <p style="margin: 0; font-style: italic; color: #555555;">
+                &ldquo;{{ comment.content|truncatechars:300 }}{% if comment.content|length > 300 %}&hellip;{% endif %}&rdquo;
             </p>
         </td>
     </tr>
@@ -59,27 +55,14 @@
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
             <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #001A70; color: #FFFFFF;">
-                {% trans "View Dataset and Comment" %}
+                {% trans "View Comment" %}
             </a>
         </td>
     </tr>
 </table>
 
-<div class="info-box" style="border-left-color: #92C1E9;">
-    <strong style="color: #1A1A1A;">{% trans "Quick Actions:" %}</strong>
-    <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555555;">
-        <li>{% trans "Reply to the comment directly on the dataset page" %}</li>
-        <li>{% trans "Share your dataset with others" %}</li>
-        <li>{% trans "Update your dataset information if needed" %}</li>
-    </ul>
-</div>
-
-<p style="margin: 24px 0 0 0;">{% trans "Thank you for sharing your dataset with the community!" %}</p>
-
-{% if not owner.email_notifications %}
-<div class="notice">
-    <strong style="color: #1A1A1A;">{% trans "Email Notifications:" %}</strong>
-    <p style="margin: 8px 0 0 0;">{% trans "You can manage your email notification preferences in your account settings." %}</p>
-</div>
-{% endif %}
+<p class="meta" style="margin: 24px 0 0 0; font-size: 14px; text-align: center;">
+    {% trans "Manage notification preferences:" %}
+    <a href="{{ settings_url }}" style="color: #001A70;">{{ settings_url }}</a>
+</p>
 {% endblock content %}

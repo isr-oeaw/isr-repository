@@ -9,7 +9,7 @@
 {% block title %}{% trans "Dataset Updated" %} - {{ site_name }}{% endblock %}
 
 {% block header %}
-<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "Dataset Has Been Updated" %}</h1>
+<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "Dataset Updated" %}</h1>
 {% endblock %}
 
 {% block header_accent %}
@@ -21,55 +21,37 @@
 {% block content %}
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
 
-<p style="margin: 0 0 24px 0;">{% blocktrans with dataset_title=dataset.title %}The dataset "{{ dataset_title }}" has been updated.{% endblocktrans %}</p>
+<p style="margin: 0 0 24px 0;">{% blocktrans with dataset_title=dataset.title %}The dataset <strong>{{ dataset_title }}</strong> has been updated. Review the latest metadata and files on the platform.{% endblocktrans %}</p>
 
 <div class="card" style="border-left: 4px solid #92C1E9;">
     <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #001A70;">{{ dataset.title }}</h3>
+    {% if dataset.description %}
     <p class="meta" style="margin: 0 0 12px 0;">{{ dataset.description|truncatechars:150 }}</p>
+    {% endif %}
     <p style="margin: 0;">
+        {% if dataset.category %}
         <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#1A1A1A{% else %}#FFFFFF{% endif %}; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin-right: 8px;">
             {{ dataset.category.name }}
         </span>
+        {% endif %}
         <span style="display: inline-block; background-color: #555555; color: #FFFFFF; padding: 4px 10px; border-radius: 4px; font-size: 13px;">
             {{ dataset.get_status_display }}
         </span>
     </p>
 </div>
 
-<div class="info-box" style="border-left-color: #92C1E9;">
-    <strong style="color: #1A1A1A;">{% trans "What's New:" %}</strong>
-    <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555555;">
-        <li>{% trans "Dataset information has been updated" %}</li>
-        <li>{% trans "Metadata and descriptions may have changed" %}</li>
-        <li>{% trans "Access permissions may have been modified" %}</li>
-    </ul>
-</div>
-
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
             <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #001A70; color: #FFFFFF;">
-                {% trans "View Updated Dataset" %}
+                {% trans "View Dataset" %}
             </a>
         </td>
     </tr>
 </table>
 
-<div class="info-box" style="border-left-color: #92C1E9;">
-    <strong style="color: #1A1A1A;">{% trans "Quick Actions:" %}</strong>
-    <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555555;">
-        <li>{% trans "Review the updated dataset information" %}</li>
-        <li>{% trans "Check if you need to update your research" %}</li>
-        <li>{% trans "Download the latest version if available" %}</li>
-    </ul>
-</div>
-
-<p style="margin: 24px 0 0 0;">{% trans "Thank you for following this dataset!" %}</p>
-
-{% if not user.notify_dataset_updates %}
-<div class="notice">
-    <strong style="color: #1A1A1A;">{% trans "Email Notifications:" %}</strong>
-    <p style="margin: 8px 0 0 0;">{% trans "You can manage your email notification preferences in your account settings." %}</p>
-</div>
-{% endif %}
+<p class="meta" style="margin: 24px 0 0 0; font-size: 14px; text-align: center;">
+    {% trans "Manage notification preferences:" %}
+    <a href="{{ settings_url }}" style="color: #001A70;">{{ settings_url }}</a>
+</p>
 {% endblock content %}

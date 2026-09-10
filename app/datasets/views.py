@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.http import HttpResponse, Http404, FileResponse, JsonResponse
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy, reverse
+from django.utils.translation import gettext as _
 from django.db.models import Q, Count
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -778,6 +779,20 @@ def delete_comment(request, comment_id):
     return redirect('datasets:dataset_detail', pk=dataset_id)
 
 
+def _notification_email_context(**extra):
+    """Shared context for dataset notification emails."""
+    from django.conf import settings
+
+    site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000').rstrip('/')
+    context = {
+        'site_name': getattr(settings, 'SITE_NAME', 'ISR Datasets'),
+        'site_url': site_url,
+        'settings_url': f'{site_url}{reverse("user-settings")}',
+    }
+    context.update(extra)
+    return context
+
+
 def send_comment_notification_email(comment):
     """Send email notification to dataset owner about new comment"""
     import logging
@@ -801,18 +816,14 @@ def send_comment_notification_email(comment):
     
     logger.info(f"Comment notifications enabled for user {owner.username}, proceeding with email")
     
-    # Prepare email context
-    context = {
-        'owner': owner,
-        'comment': comment,
-        'dataset': dataset,
-        'commenter': comment.author,
-        'site_name': getattr(settings, 'SITE_NAME', 'ISR Datasets'),
-        'site_url': getattr(settings, 'SITE_URL', 'http://localhost:8000'),
-    }
+    context = _notification_email_context(
+        owner=owner,
+        comment=comment,
+        dataset=dataset,
+        commenter=comment.author,
+    )
     
-    # Render email templates
-    subject = f'New comment on your dataset: {dataset.title}'
+    subject = _('New comment on your dataset: %(title)s') % {'title': dataset.title}
     html_message = render_to_string('datasets/email/comment_notification.html', context)
     plain_message = render_to_string('datasets/email/comment_notification.txt', context)
     
@@ -866,31 +877,22 @@ def send_dataset_update_notification_email(dataset):
         logger.info("No users to notify for dataset updates, skipping email")
         return
     
-    # Prepare email context
-    context = {
-        'dataset': dataset,
-        'site_name': getattr(settings, 'SITE_NAME', 'ISR Datasets'),
-        'site_url': getattr(settings, 'SITE_URL', 'http://localhost:8000'),
-    }
-    
-    # Render email templates
-    subject = f'Dataset updated: {dataset.title}'
-    html_message = render_to_string('datasets/email/dataset_update_notification.html', context)
-    plain_message = render_to_string('datasets/email/dataset_update_notification.txt', context)
-    
-    logger.info(f"Email templates rendered successfully")
-    logger.info(f"Subject: {subject}")
-    logger.info(f"Plain message length: {len(plain_message)} chars")
-    logger.info(f"HTML message length: {len(html_message)} chars")
-    
-    # Send emails to all users
+    subject = _('Dataset updated: %(title)s') % {'title': dataset.title}
     success_count = 0
     failure_count = 0
     
     for user in users_to_notify:
         try:
             logger.info(f"Attempting to send dataset update notification email to {user.email}")
-            context['user'] = user
+            context = _notification_email_context(dataset=dataset, user=user)
+            html_message = render_to_string(
+                'datasets/email/dataset_update_notification.html',
+                context,
+            )
+            plain_message = render_to_string(
+                'datasets/email/dataset_update_notification.txt',
+                context,
+            )
             result = send_mail(
                 subject=subject,
                 message=plain_message,
@@ -933,32 +935,29 @@ def send_new_version_notification_email(dataset, version):
         logger.info("No users to notify for new versions, skipping email")
         return
     
-    # Prepare email context
-    context = {
-        'dataset': dataset,
-        'version': version,
-        'site_name': getattr(settings, 'SITE_NAME', 'ISR Datasets'),
-        'site_url': getattr(settings, 'SITE_URL', 'http://localhost:8000'),
+    subject = _('New version available: %(title)s v%(version)s') % {
+        'title': dataset.title,
+        'version': version.version_number,
     }
-    
-    # Render email templates
-    subject = f'New version available: {dataset.title} v{version.version_number}'
-    html_message = render_to_string('datasets/email/new_version_notification.html', context)
-    plain_message = render_to_string('datasets/email/new_version_notification.txt', context)
-    
-    logger.info(f"Email templates rendered successfully")
-    logger.info(f"Subject: {subject}")
-    logger.info(f"Plain message length: {len(plain_message)} chars")
-    logger.info(f"HTML message length: {len(html_message)} chars")
-    
-    # Send emails to all users
     success_count = 0
     failure_count = 0
     
     for user in users_to_notify:
         try:
             logger.info(f"Attempting to send new version notification email to {user.email}")
-            context['user'] = user
+            context = _notification_email_context(
+                dataset=dataset,
+                version=version,
+                user=user,
+            )
+            html_message = render_to_string(
+                'datasets/email/new_version_notification.html',
+                context,
+            )
+            plain_message = render_to_string(
+                'datasets/email/new_version_notification.txt',
+                context,
+            )
             result = send_mail(
                 subject=subject,
                 message=plain_message,
