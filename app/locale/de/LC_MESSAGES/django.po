@@ -640,7 +640,7 @@ msgstr ""
 #: templates/user/management.html:6 templates/user/password_change.html:4
 #: templates/user/profile.html:4 templates/user/role_list.html:6
 #: templates/user/settings.html:6 templates/user/user_form.html:5
-msgid "ISR Datasets"
+msgid "ISR Repository"
 msgstr ""
 
 #: templates/account/account_inactive.html:16
@@ -802,7 +802,7 @@ msgstr ""
 
 #: templates/account/email/email_confirmation_message.html:70
 msgid ""
-"Once confirmed, you'll be able to access all features of the ISR Datasets "
+"Once confirmed, you'll be able to access all features of the ISR Repository "
 "platform."
 msgstr ""
 
@@ -905,7 +905,7 @@ msgid "Welcome Back"
 msgstr ""
 
 #: templates/account/login.html:16 templates/user/login.html:16
-msgid "Sign in to your ISR Datasets account"
+msgid "Sign in to your ISR Repository account"
 msgstr ""
 
 #: templates/account/login.html:25 templates/account/logout.html:36
@@ -2412,7 +2412,7 @@ msgid "Documentation"
 msgstr ""
 
 #: templates/documentation.html:17
-msgid "Complete guide to using the ISR Datasets platform"
+msgid "Complete guide to using the ISR Repository platform"
 msgstr ""
 
 #: templates/documentation.html:28
@@ -2441,7 +2441,7 @@ msgid "Account Creation"
 msgstr ""
 
 #: templates/documentation.html:63
-msgid "To use the ISR Datasets platform, you need to create an account:"
+msgid "To use the ISR Repository platform, you need to create an account:"
 msgstr ""
 
 #: templates/documentation.html:65
@@ -3171,7 +3171,7 @@ msgid "Stable internet connection for file uploads"
 msgstr ""
 
 #: templates/home.html:14
-msgid "Welcome to ISR Datasets"
+msgid "Welcome to ISR Repository"
 msgstr ""
 
 #: templates/home.html:17

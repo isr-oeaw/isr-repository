@@ -1,7 +1,7 @@
 {% extends "account/email/base_message.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Sign-In Code" %} - {{ site_name|default:"ISR Datasets" }}{% endblock %}
+{% block title %}{% trans "Sign-In Code" %} - {{ site_name|default:"ISR Repository" }}{% endblock %}
 
 {% block header %}
 <h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "Your Sign-In Code" %}</h1>
@@ -11,7 +11,7 @@
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %},</p>
 
 <p style="margin: 0 0 16px 0;">
-    {% blocktrans with site_name=site_name|default:"ISR Datasets" %}You requested to sign in to {{ site_name }}. Use the code below or click the button to sign in.{% endblocktrans %}
+    {% blocktrans with site_name=site_name|default:"ISR Repository" %}You requested to sign in to {{ site_name }}. Use the code below or click the button to sign in.{% endblocktrans %}
 </p>
 
 <div class="card" style="text-align: center; margin: 24px 0;">

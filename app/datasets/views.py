@@ -808,7 +808,7 @@ def _notification_email_context(**extra):
 
     site_url = getattr(settings, 'SITE_URL', 'http://localhost:8000').rstrip('/')
     context = {
-        'site_name': getattr(settings, 'SITE_NAME', 'ISR Datasets'),
+        'site_name': getattr(settings, 'SITE_NAME', 'ISR Repository'),
         'site_url': site_url,
         'settings_url': f'{site_url}{reverse("user-settings")}',
     }

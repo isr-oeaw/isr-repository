@@ -19,7 +19,7 @@ services:
     env_file:
       - .env
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U isruser -d isrdatasets"]
+      test: ["CMD-SHELL", "pg_isready -U isruser -d isrrepository"]
       interval: 10s
       timeout: 5s
       retries: 5

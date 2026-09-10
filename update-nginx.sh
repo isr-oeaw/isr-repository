@@ -28,7 +28,7 @@ echo ""
 
 # Build the nginx image locally
 echo "🔨 Building nginx image locally..."
-docker build -t isr-datasets-nginx:latest ./nginx
+docker build -t isr-repository-nginx:latest ./nginx
 
 if [ $? -eq 0 ]; then
     echo "✅ Nginx image built successfully"
@@ -43,17 +43,17 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     # Tag for GitHub Container Registry
     echo "📦 Tagging image for GitHub Container Registry..."
-    docker tag isr-datasets-nginx:latest ghcr.io/silvioheinze/isr-datasets-nginx:latest
+    docker tag isr-repository-nginx:latest ghcr.io/silvioheinze/isr-repository-nginx:latest
     
     # Push to registry
     echo "⬆️  Pushing to GitHub Container Registry..."
-    docker push ghcr.io/silvioheinze/isr-datasets-nginx:latest
+    docker push ghcr.io/silvioheinze/isr-repository-nginx:latest
     
     if [ $? -eq 0 ]; then
         echo "✅ Nginx image pushed successfully to GitHub Container Registry"
         echo ""
         echo "🎯 Next steps for production deployment:"
-        echo "  1. Pull the updated image: docker pull ghcr.io/silvioheinze/isr-datasets-nginx:latest"
+        echo "  1. Pull the updated image: docker pull ghcr.io/silvioheinze/isr-repository-nginx:latest"
         echo "  2. Restart nginx service: docker compose -f docker-compose.prod.yml restart nginx"
         echo "  3. Or redeploy: docker compose -f docker-compose.prod.yml up -d nginx"
     else
@@ -61,7 +61,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         exit 1
     fi
 else
-    echo "ℹ️  Skipping registry push. Image is available locally as 'isr-datasets-nginx:latest'"
+    echo "ℹ️  Skipping registry push. Image is available locally as 'isr-repository-nginx:latest'"
     echo ""
     echo "🎯 To use locally:"
     echo "  1. Update docker-compose.yml to use local image"

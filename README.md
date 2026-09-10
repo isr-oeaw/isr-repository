@@ -1,4 +1,4 @@
-# ISR Datasets
+# ISR Repository
 
 A comprehensive Django-based platform for managing, accessing, and analyzing research datasets. Built with modern web technologies and designed for researchers, data scientists, and academic institutions.
 
@@ -35,7 +35,7 @@ A comprehensive Django-based platform for managing, accessing, and analyzing res
 
 ```bash
 git clone <repository-url>
-cd isr-datasets
+cd isr-repository
 ```
 
 ### 2. Environment Configuration
@@ -44,7 +44,7 @@ Create a `.env` file in the project root with the following variables:
 
 ```env
 # Database Configuration
-POSTGRES_DB=isrdatasets
+POSTGRES_DB=isrrepository
 POSTGRES_USER=isruser
 POSTGRES_PASSWORD=your_secure_password
 POSTGRES_HOST=db
@@ -63,7 +63,7 @@ EMAIL_HOST_USER=your-email@gmail.com
 EMAIL_HOST_PASSWORD=your-app-password
 
 # Site Configuration
-SITE_NAME=ISR Datasets
+SITE_NAME=ISR Repository
 SITE_URL=http://localhost:8000
 ```
 
@@ -89,7 +89,7 @@ docker compose logs app
 ## 🏗️ Project Structure
 
 ```
-isr-datasets/
+isr-repository/
 ├── app/                          # Django application
 │   ├── main/                     # Main Django project
 │   │   ├── settings.py           # Django settings
@@ -273,13 +273,13 @@ The application uses PostgreSQL with PostGIS extension for geospatial data suppo
 
 ```bash
 # Access database shell
-docker compose exec db psql -U isruser -d isrdatasets
+docker compose exec db psql -U isruser -d isrrepository
 
 # Create database backup
-docker compose exec db pg_dump -U isruser isrdatasets > backup.sql
+docker compose exec db pg_dump -U isruser isrrepository > backup.sql
 
 # Restore database backup
-docker compose exec -T db psql -U isruser -d isrdatasets < backup.sql
+docker compose exec -T db psql -U isruser -d isrrepository < backup.sql
 ```
 
 ### Database Admin (pgAdmin)
@@ -397,8 +397,8 @@ EMAIL_USE_TLS=True
 EMAIL_USE_SSL=False
 EMAIL_HOST_USER=your_email@gmail.com
 EMAIL_HOST_PASSWORD=your_app_password
-DEFAULT_FROM_EMAIL=noreply@isrdatasets.dataplexity.eu
-SERVER_EMAIL=noreply@isrdatasets.dataplexity.eu
+DEFAULT_FROM_EMAIL=noreply@isrrepository.dataplexity.eu
+SERVER_EMAIL=noreply@isrrepository.dataplexity.eu
 ```
 
 #### Gmail Setup (Recommended)
@@ -407,7 +407,7 @@ SERVER_EMAIL=noreply@isrdatasets.dataplexity.eu
 2. **Create App Password**:
    - Go to [Google Account Security](https://myaccount.google.com/security)
    - Navigate to "App passwords"
-   - Generate password for "ISR Datasets"
+   - Generate password for "ISR Repository"
    - Use the 16-character password as `EMAIL_HOST_PASSWORD`
 
 ### Troubleshooting Email Issues
@@ -457,7 +457,7 @@ The application uses environment variables to configure the site name and URL, w
 
 #### Environment Variables
 
-- **`SITE_NAME`**: The name of the site displayed in the navbar, page titles, email templates, and footer. Default: `ISR Datasets`
+- **`SITE_NAME`**: The name of the site displayed in the navbar, page titles, email templates, and footer. Default: `ISR Repository`
 - **`SITE_URL`**: The base URL of the installation used for generating absolute links in emails and notifications. Default: `http://localhost:8000`
 
 These variables are automatically available in all templates via the context processor as `{{ SITE_NAME }}` and `{{ SITE_URL }}`.
@@ -601,4 +601,4 @@ docker compose exec app python manage.py collectstatic --noinput
 
 ---
 
-**ISR Datasets** - Empowering research through data management
+**ISR Repository** - Empowering research through data management
