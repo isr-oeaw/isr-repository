@@ -6,29 +6,24 @@
 {% block title %}{% trans "Role Management" %} - {{ SITE_NAME }}{% endblock title %}
 
 {% block content %}
-<div class="container mt-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h2 mb-1">
-                        <i class="bi bi-shield-check me-2"></i>
-                        {% trans "Role Management" %}
-                    </h1>
-                    <p class="text-muted">{% trans "Manage user roles and permissions" %}</p>
-                </div>
-                <div>
-                    <a href="{% url 'role-create' %}" class="btn btn-primary">
-                        <i class="bi bi-plus-circle me-2"></i>
-                        {% trans "Add Role" %}
-                    </a>
-                    <a href="{% url 'user-management' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left me-2"></i>
-                        {% trans "Back to Management" %}
-                    </a>
-                </div>
-            </div>
+<div class="container">
+    <div class="page-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="page-title">
+                <i class="bi bi-shield-check me-2"></i>
+                {% trans "Role Management" %}
+            </h1>
+            <p class="page-subtitle">{% trans "Manage user roles and permissions" %}</p>
+        </div>
+        <div class="page-actions">
+            <a href="{% url 'user-list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>
+                {% trans "User Management" %}
+            </a>
+            <a href="{% url 'role-create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>
+                {% trans "Add Role" %}
+            </a>
         </div>
     </div>
 
