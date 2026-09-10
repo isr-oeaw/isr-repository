@@ -657,6 +657,11 @@ footer {
     border-color: transparent !important;
 }
 
+.settings-nav .list-group-item {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+}
+
 /* Featured dataset cards */
 .card.border-primary {
     border: none !important;
