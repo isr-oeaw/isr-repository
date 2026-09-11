@@ -181,11 +181,22 @@
         <div class="col-lg-4">
             <!-- Project Team -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="bi bi-people me-2"></i>
                         {% trans "Project Team" %}
                     </h5>
+                    {% if can_invite_partner %}
+                    <button type="button"
+                            class="btn btn-outline-primary btn-sm"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#invite-project-partner"
+                            aria-expanded="false"
+                            aria-controls="invite-project-partner">
+                        <i class="bi bi-person-plus me-1"></i>
+                        {% trans "Invite project partner" %}
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -215,6 +226,7 @@
                     {% endif %}
 
                     {% if can_invite_partner %}
+                    <div id="invite-project-partner" class="collapse">
                         <hr>
                         <h6>{% trans "Invite project partner" %}</h6>
                         <form method="post" action="{% url 'projects:project_invite_partner' project.pk %}">
@@ -238,6 +250,7 @@
                                 {% trans "Send invitation" %}
                             </button>
                         </form>
+                    </div>
                     {% endif %}
                 </div>
             </div>
