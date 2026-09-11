@@ -3,11 +3,9 @@
 
 {% block title %}{% trans "Your account has been created" %} - {{ site_name }}{% endblock %}
 
-{% block header %}
-<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "Welcome to" %} {{ site_name }}</h1>
-{% endblock %}
-
 {% block content %}
+<h1 class="email-title">{% trans "Welcome to" %} {{ site_name }}</h1>
+
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
 
 {% if project %}
@@ -17,24 +15,24 @@
 {% endif %}
 
 <div class="info-box">
-    <strong style="color: #1A1A1A;">{% trans "Your account details" %}</strong>
+    <strong style="color: #0b0b0b;">{% trans "Your account details" %}</strong>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top: 12px; width: 100%;">
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Username" %}:</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ username }}</td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Username" %}:</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ username }}</td>
         </tr>
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Email" %}:</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ email }}</td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Email" %}:</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ email }}</td>
         </tr>
         {% if role_name %}
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Role" %}:</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ role_name }}</td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Role" %}:</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ role_name }}</td>
         </tr>
         {% endif %}
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Login page" %}:</strong></td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Login page" %}:</strong></td>
             <td style="padding: 4px 0;"><a href="{{ login_url }}" style="color: #0047BB;">{{ login_url }}</a></td>
         </tr>
     </table>
@@ -43,7 +41,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-            <a href="{{ login_url }}" class="btn" style="background-color: #0047BB; color: #FFFFFF;">
+            <a href="{{ login_url }}" class="btn" style="background-color: #0047BB; color: #ffffff;">
                 {% trans "Sign in" %}
             </a>
         </td>
@@ -53,7 +51,7 @@
 <p style="margin: 0 0 16px 0;">{% trans "On the login page, enter your email address to receive a sign-in code or magic link. You can also sign in with a password if you have set one." %}</p>
 
 <div class="notice">
-    <strong style="color: #1A1A1A;">{% trans "Optional:" %}</strong>
+    <strong style="color: #0b0b0b;">{% trans "Optional:" %}</strong>
     <p style="margin: 8px 0 0 0;">{% trans "If you prefer to use a password, you can set one using the link below." %}</p>
 </div>
 

@@ -3,11 +3,9 @@
 
 {% block title %}{% trans "Sign-In Code" %} - {{ site_name|default:"ISR Repository" }}{% endblock %}
 
-{% block header %}
-<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "Your Sign-In Code" %}</h1>
-{% endblock %}
-
 {% block content %}
+<h1 class="email-title">{% trans "Your Sign-In Code" %}</h1>
+
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %},</p>
 
 <p style="margin: 0 0 16px 0;">
@@ -15,7 +13,7 @@
 </p>
 
 <div class="card" style="text-align: center; margin: 24px 0;">
-    <p style="margin: 0 0 8px 0; font-size: 14px; color: #555555; text-transform: uppercase; letter-spacing: 1px;">
+    <p style="margin: 0 0 8px 0; font-size: 14px; color: #52514e; text-transform: uppercase; letter-spacing: 1px;">
         {% trans "Anmelde-Code" %}
     </p>
     <p style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0047BB; font-family: monospace;">
@@ -27,7 +25,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-            <a href="{{ magic_login_url }}" class="btn" style="background-color: #0047BB; color: #FFFFFF;">
+            <a href="{{ magic_login_url }}" class="btn" style="background-color: #0047BB; color: #ffffff;">
                 {% trans "Sign In" %}
             </a>
         </td>
@@ -41,7 +39,7 @@
 {% endif %}
 
 <div class="notice">
-    <strong style="color: #1A1A1A;">{% trans "Security notice:" %}</strong>
+    <strong style="color: #0b0b0b;">{% trans "Security notice:" %}</strong>
     <p style="margin: 8px 0 0 0;">{% trans "This code and link expire in 15 minutes. If you did not request this email, please ignore it." %}</p>
 </div>
 {% endblock content %}

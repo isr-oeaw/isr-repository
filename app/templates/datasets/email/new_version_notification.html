@@ -1,24 +1,11 @@
 {% extends "account/email/base_message.html" %}
 {% load i18n %}
 
-{% block header_bg %}#001A70{% endblock %}
-{% block accent_color %}#92C1E9{% endblock %}
-{% block heading_color %}#001A70{% endblock %}
-{% block link_color %}#001A70{% endblock %}
-
 {% block title %}{% trans "New Dataset Version Available" %} - {{ site_name }}{% endblock %}
 
-{% block header %}
-<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "New Version Available" %}</h1>
-{% endblock %}
-
-{% block header_accent %}
-<tr>
-    <td style="background-color: #92C1E9; height: 6px; font-size: 0; line-height: 0;">&nbsp;</td>
-</tr>
-{% endblock %}
-
 {% block content %}
+<h1 class="email-title">{% trans "New Version Available" %}</h1>
+
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
 
 <p style="margin: 0 0 24px 0;">{% blocktrans with dataset_title=dataset.title version=version.version_number %}Version <strong>{{ version }}</strong> of <strong>{{ dataset_title }}</strong> is now available for download.{% endblocktrans %}</p>
@@ -30,43 +17,43 @@
     {% endif %}
     <p style="margin: 0;">
         {% if dataset.category %}
-        <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#1A1A1A{% else %}#FFFFFF{% endif %}; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin-right: 8px;">
+        <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#0b0b0b{% else %}#ffffff{% endif %}; padding: 4px 10px; border-radius: 10px; font-size: 13px; margin-right: 8px;">
             {{ dataset.category.name }}
         </span>
         {% endif %}
-        <span style="display: inline-block; background-color: #001A70; color: #FFFFFF; padding: 4px 10px; border-radius: 4px; font-size: 13px;">
+        <span style="display: inline-block; background-color: #001A70; color: #ffffff; padding: 4px 10px; border-radius: 10px; font-size: 13px;">
             v{{ version.version_number }}
         </span>
     </p>
 </div>
 
-<div class="info-box" style="border-left-color: #92C1E9; background-color: #E8F0FA;">
+<div class="info-box" style="border-left-color: #92C1E9;">
     <strong style="color: #001A70;">{% trans "Version details" %}</strong>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top: 12px; width: 100%;">
         <tr>
-            <td style="padding: 4px 0; color: #555555; width: 35%;"><strong style="color: #1A1A1A;">{% trans "Released" %}</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.created_at|date:"F d, Y \a\t g:i A" }}</td>
+            <td style="padding: 4px 0; color: #52514e; width: 35%;"><strong style="color: #0b0b0b;">{% trans "Released" %}</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ version.created_at|date:"F d, Y \a\t g:i A" }}</td>
         </tr>
         {% if version.description %}
         <tr>
-            <td valign="top" style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Changes" %}</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.description|truncatechars:200 }}</td>
+            <td valign="top" style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Changes" %}</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ version.description|truncatechars:200 }}</td>
         </tr>
         {% endif %}
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Size" %}</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.get_file_size_display }}</td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Size" %}</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ version.get_file_size_display }}</td>
         </tr>
         {% with attachment_count=version.files.count %}
         {% if attachment_count %}
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "Files" %}</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ attachment_count }}</td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "Files" %}</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ attachment_count }}</td>
         </tr>
         {% elif version.file %}
         <tr>
-            <td style="padding: 4px 0; color: #555555;"><strong style="color: #1A1A1A;">{% trans "File" %}</strong></td>
-            <td style="padding: 4px 0; color: #1A1A1A;">{{ version.file.name|slice:"-50:" }}</td>
+            <td style="padding: 4px 0; color: #52514e;"><strong style="color: #0b0b0b;">{% trans "File" %}</strong></td>
+            <td style="padding: 4px 0; color: #0b0b0b;">{{ version.file.name|slice:"-50:" }}</td>
         </tr>
         {% endif %}
         {% endwith %}
@@ -76,7 +63,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-            <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #001A70; color: #FFFFFF;">
+            <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #0047BB; color: #ffffff;">
                 {% trans "View and Download" %}
             </a>
         </td>
@@ -85,6 +72,6 @@
 
 <p class="meta" style="margin: 24px 0 0 0; font-size: 14px; text-align: center;">
     {% trans "Manage notification preferences:" %}
-    <a href="{{ settings_url }}" style="color: #001A70;">{{ settings_url }}</a>
+    <a href="{{ settings_url }}" style="color: #0047BB;">{{ settings_url }}</a>
 </p>
 {% endblock content %}
