@@ -332,7 +332,6 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>{% trans "Dataset" %}</th>
-                                        <th>{% trans "Category" %}</th>
                                         <th>{% trans "Status" %}</th>
                                         <th>{% trans "Versions" %}</th>
                                         <th>{% trans "Downloads" %}</th>
@@ -359,15 +358,6 @@
                                                     {% endif %}
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td>
-                                            {% if dataset.category %}
-                                                <span class="badge" style="background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#000{% else %}#fff{% endif %};">
-                                                    {{ dataset.category.name }}
-                                                </span>
-                                            {% else %}
-                                                <span class="text-muted">{% trans "No category" %}</span>
-                                            {% endif %}
                                         </td>
                                         <td>
                                             <span class="badge {% if dataset.status == 'published' %}bg-success{% elif dataset.status == 'draft' %}bg-warning{% else %}bg-secondary{% endif %}">
