@@ -111,7 +111,7 @@ class ProjectDetailView(LoginRequiredMixin, DetailView):
     
     def get_queryset(self):
         return Project.objects.select_related('owner').prefetch_related(
-            'collaborators', 'datasets__owner', 'datasets__category', 'datasets__versions'
+            'collaborators', 'datasets__owner', 'datasets__versions'
         )
     
     def get_object(self, queryset=None):
