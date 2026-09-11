@@ -421,8 +421,8 @@
                                         <small class="text-muted">{{ version.created_at|date:"M d, Y H:i" }}</small>
                                     </td>
                                     <td>
-                                        {% if attachments %}
-                                            <div class="d-flex flex-column gap-2">
+                                        <div class="d-flex flex-column gap-2">
+                                            {% if attachments %}
                                                 {% for attachment in attachments %}
                                                     <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}&file={{ attachment.id }}"
                                                        class="btn btn-outline-primary btn-sm text-start"
@@ -431,23 +431,39 @@
                                                         {{ attachment.display_name }}
                                                     </a>
                                                 {% endfor %}
-                                            </div>
-                                        {% elif version.file %}
-                                            <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}" 
-                                               class="btn btn-outline-primary btn-sm" 
-                                               title="{% trans 'Download this version' %}">
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                        {% elif version.file_url %}
-                                        <a href="{{ version.file_url }}" 
-                                           class="btn btn-outline-info btn-sm" 
-                                           target="_blank"
-                                           title="{% trans 'Open external URL' %}">
-                                            <i class="bi bi-box-arrow-up-right"></i>
-                                        </a>
-                                        {% else %}
-                                        <span class="text-muted">{% trans "No file" %}</span>
-                                        {% endif %}
+                                            {% elif version.file %}
+                                                <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}"
+                                                   class="btn btn-outline-primary btn-sm"
+                                                   title="{% trans 'Download this version' %}">
+                                                    <i class="bi bi-download"></i>
+                                                </a>
+                                            {% elif version.file_url %}
+                                                <a href="{{ version.file_url }}"
+                                                   class="btn btn-outline-info btn-sm"
+                                                   target="_blank"
+                                                   title="{% trans 'Open external URL' %}">
+                                                    <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">{% trans "No file" %}</span>
+                                            {% endif %}
+                                            {% if user.is_authenticated %}
+                                                {% if user.is_superuser or user == dataset.owner or user == version.created_by %}
+                                                <div class="d-flex gap-2 mt-1">
+                                                    <a href="{% url 'datasets:dataset_version_edit' dataset.pk version.pk %}"
+                                                       class="btn btn-outline-secondary btn-sm"
+                                                       title="{% trans 'Edit version' %}">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a href="{% url 'datasets:dataset_version_delete' dataset.pk version.pk %}"
+                                                       class="btn btn-outline-danger btn-sm"
+                                                       title="{% trans 'Delete version' %}">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
                                     </td>
                                     {% endwith %}
                                 </tr>

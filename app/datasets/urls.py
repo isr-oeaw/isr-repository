@@ -15,6 +15,8 @@ urlpatterns = [
     path('<uuid:pk>/assign-project/', views.assign_dataset_to_project, name='assign_to_project'),
     path('<uuid:dataset_pk>/version/upload-chunk/', views.upload_dataset_version_chunk, name='dataset_version_upload_chunk'),
     path('<uuid:dataset_pk>/version/create/', views.DatasetVersionCreateView.as_view(), name='dataset_version_create'),
+    path('<uuid:dataset_pk>/version/<int:pk>/edit/', views.DatasetVersionUpdateView.as_view(), name='dataset_version_edit'),
+    path('<uuid:dataset_pk>/version/<int:pk>/delete/', views.DatasetVersionDeleteView.as_view(), name='dataset_version_delete'),
     
     # Analysis/DataViz views
     path('<uuid:pk>/analysis/upload/', views.upload_dataset_analysis, name='upload_analysis'),

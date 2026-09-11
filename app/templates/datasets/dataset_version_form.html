@@ -1,7 +1,7 @@
 {% extends "_base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Add New Version" %} - {{ dataset.title }} - {{ SITE_NAME }}{% endblock title %}
+{% block title %}{% if is_edit %}{% trans "Edit Version" %}{% else %}{% trans "Add New Version" %}{% endif %} - {{ dataset.title }} - {{ SITE_NAME }}{% endblock title %}
 
 {% block content %}
 <div class="container mt-4">
@@ -18,14 +18,27 @@
                             <li class="breadcrumb-item">
                                 <a href="{% url 'datasets:dataset_detail' dataset.pk %}">{{ dataset.title }}</a>
                             </li>
-                            <li class="breadcrumb-item active" aria-current="page">{% trans "Add New Version" %}</li>
+                            <li class="breadcrumb-item active" aria-current="page">
+                                {% if is_edit %}{% trans "Edit Version" %}{% else %}{% trans "Add New Version" %}{% endif %}
+                            </li>
                         </ol>
                     </nav>
                     <h1 class="h2 mb-1">
+                        {% if is_edit %}
+                        <i class="bi bi-pencil me-2"></i>
+                        {% trans "Edit Version" %}
+                        {% else %}
                         <i class="bi bi-plus-circle me-2"></i>
                         {% trans "Add New Version" %}
+                        {% endif %}
                     </h1>
-                    <p class="text-muted">{% trans "Create a new version for" %} <strong>{{ dataset.title }}</strong></p>
+                    <p class="text-muted">
+                        {% if is_edit %}
+                        {% blocktrans with version_number=version.version_number %}Update version {{ version_number }} of{% endblocktrans %} <strong>{{ dataset.title }}</strong>
+                        {% else %}
+                        {% trans "Create a new version for" %} <strong>{{ dataset.title }}</strong>
+                        {% endif %}
+                    </p>
                 </div>
             </div>
 
@@ -128,11 +141,33 @@
                             </div>
                         </div>
 
+                        {% if is_edit %}
+                        <div class="alert alert-light border mb-4">
+                            <strong>{% trans "Current source" %}:</strong>
+                            {% if existing_attachments %}
+                            <ul class="mb-0 mt-2">
+                                {% for attachment in existing_attachments %}
+                                <li>{{ attachment.display_name }} ({{ attachment.file_size|filesizeformat }})</li>
+                                {% endfor %}
+                            </ul>
+                            <p class="mb-0 mt-2 text-muted small">{% trans "Upload new files below to replace the current attachments." %}</p>
+                            {% elif version.file %}
+                            <p class="mb-0 mt-2">{{ version.file.name|slice:"-50:" }}</p>
+                            {% elif version.file_url %}
+                            <p class="mb-0 mt-2"><a href="{{ version.file_url }}" target="_blank" rel="noopener">{{ version.file_url }}</a></p>
+                            {% elif version.file_url_description %}
+                            <p class="mb-0 mt-2">{{ version.file_url_description }}</p>
+                            {% else %}
+                            <p class="mb-0 mt-2 text-muted">{% trans "No files attached." %}</p>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
                         <!-- File Upload Section -->
                         <div id="file-upload-section" class="mb-4">
                             <label for="{{ form.files.id_for_label }}" class="form-label">
                                 <i class="bi bi-upload me-1"></i>
-                                {% trans "Version Files" %} <span class="text-danger">*</span>
+                                {% trans "Version Files" %}{% if not is_edit %} <span class="text-danger">*</span>{% endif %}
                             </label>
                             <input 
                                 type="file" 
@@ -242,8 +277,13 @@
                                 {% trans "Cancel" %}
                             </a>
                             <button type="submit" class="btn btn-primary" id="submit-btn">
+                                {% if is_edit %}
+                                <i class="bi bi-check-circle me-2"></i>
+                                <span id="submit-btn-text">{% trans "Save Changes" %}</span>
+                                {% else %}
                                 <i class="bi bi-plus-circle me-2"></i>
                                 <span id="submit-btn-text">{% trans "Create Version" %}</span>
+                                {% endif %}
                                 <span id="submit-btn-spinner" class="spinner-border spinner-border-sm ms-2" role="status" aria-hidden="true" style="display: none;"></span>
                             </button>
                         </div>
