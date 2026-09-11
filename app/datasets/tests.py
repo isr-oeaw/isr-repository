@@ -27,8 +27,12 @@ from .views import (
     send_comment_notification_email,
     send_dataset_update_notification_email,
     send_new_version_notification_email,
-    DatasetListView, DatasetDetailView, DatasetCreateView, 
+    DatasetListView, DatasetDetailView, DatasetCreateView,
     DatasetUpdateView, DatasetDeleteView, DatasetVersionCreateView,
+    DatasetVersionUpdateView, DatasetVersionDeleteView,
+    user_can_manage_dataset_versions, user_can_modify_dataset_version,
+    user_can_upload_version_chunks, _clear_version_files,
+    _promote_next_dataset_version,
     add_comment, edit_comment, delete_comment, dataset_download,
     assign_dataset_to_project,
     upload_dataset_analysis, delete_dataset_analysis, download_dataset_analysis,
@@ -1174,6 +1178,266 @@ class DatasetVersionModelTests(TestCase):
             original_name='attachment.csv'
         )
         self.assertTrue(version.has_file())
+
+
+class DatasetVersionEditDeleteTests(TestCase):
+    """Tests for editing and deleting dataset versions."""
+
+    def setUp(self):
+        self.temp_media = TemporaryDirectory()
+        self.override_media = override_settings(MEDIA_ROOT=self.temp_media.name)
+        self.override_media.enable()
+
+        self.owner = User.objects.create_user(
+            username='versionowner',
+            email='versionowner@example.com',
+            password='testpass123',
+        )
+        self.contributor = User.objects.create_user(
+            username='versioncontributor',
+            email='versioncontributor@example.com',
+            password='testpass123',
+        )
+        self.author = User.objects.create_user(
+            username='versionauthor',
+            email='versionauthor@example.com',
+            password='testpass123',
+        )
+        self.superuser = User.objects.create_superuser(
+            username='versionsuper',
+            email='versionsuper@example.com',
+            password='testpass123',
+        )
+        self.other_user = User.objects.create_user(
+            username='versionother',
+            email='versionother@example.com',
+            password='testpass123',
+        )
+
+        self.dataset = Dataset.objects.create(
+            title='Version Edit Dataset',
+            description='Dataset for version edit/delete tests',
+            owner=self.owner,
+        )
+        self.dataset.contributors.add(self.contributor)
+
+        self.version = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='1.0',
+            description='Initial version',
+            created_by=self.author,
+            is_current=True,
+            file_size=12,
+        )
+        self.attachment = DatasetVersionFile.objects.create(
+            version=self.version,
+            file=SimpleUploadedFile('data.csv', b'col1,col2\n'),
+            file_size=12,
+            original_name='data.csv',
+        )
+        self.older_version = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='0.9',
+            description='Older version',
+            created_by=self.owner,
+            is_current=False,
+        )
+
+        self.edit_url = reverse(
+            'datasets:dataset_version_edit',
+            args=[self.dataset.pk, self.version.pk],
+        )
+        self.delete_url = reverse(
+            'datasets:dataset_version_delete',
+            args=[self.dataset.pk, self.version.pk],
+        )
+        self.client = Client()
+
+    def tearDown(self):
+        self.override_media.disable()
+        self.temp_media.cleanup()
+
+    def test_form_allows_same_version_number_when_editing(self):
+        form = DatasetVersionForm(
+            data={
+                'version_number': '1.0',
+                'description': 'Updated description',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+            },
+            instance=self.version,
+            dataset=self.dataset,
+            user=self.owner,
+        )
+        self.assertTrue(form.is_valid())
+
+    def test_form_allows_metadata_only_edit_without_reupload(self):
+        form = DatasetVersionForm(
+            data={
+                'version_number': '1.0',
+                'description': 'Updated description only',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+            },
+            instance=self.version,
+            dataset=self.dataset,
+            user=self.owner,
+        )
+        self.assertTrue(form.is_valid())
+        self.assertTrue(form.cleaned_data.get('keep_existing_files'))
+
+    def test_owner_can_edit_version_metadata_only(self):
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.post(
+            self.edit_url,
+            {
+                'version_number': '1.0',
+                'description': 'Owner updated description',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.description, 'Owner updated description')
+        self.assertEqual(self.version.files.count(), 1)
+        self.assertEqual(self.version.files.first().original_name, 'data.csv')
+
+    def test_author_can_edit_their_version(self):
+        self.client.login(username='versionauthor', password='testpass123')
+        response = self.client.get(self.edit_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'datasets/dataset_version_form.html')
+
+    def test_superuser_can_edit_version(self):
+        self.client.login(username='versionsuper', password='testpass123')
+        response = self.client.get(self.edit_url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_contributor_cannot_edit_version_they_did_not_create(self):
+        self.client.login(username='versioncontributor', password='testpass123')
+        response = self.client.get(self.edit_url, follow=True)
+        self.assertRedirects(response, reverse('datasets:dataset_detail', args=[self.dataset.pk]))
+
+    def test_unrelated_user_cannot_edit_version(self):
+        self.client.login(username='versionother', password='testpass123')
+        response = self.client.get(self.edit_url, follow=True)
+        self.assertRedirects(response, reverse('datasets:dataset_detail', args=[self.dataset.pk]))
+
+    def test_edit_replaces_uploaded_files(self):
+        self.client.login(username='versionowner', password='testpass123')
+        new_file = SimpleUploadedFile('replacement.csv', b'new,data\n')
+        response = self.client.post(
+            self.edit_url,
+            {
+                'version_number': '1.0',
+                'description': 'Replaced files',
+                'input_method': 'upload',
+                'file_url': '',
+                'file_url_description': '',
+                'file_size_text': '',
+                'files': new_file,
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.files.count(), 1)
+        self.assertEqual(self.version.files.first().original_name, 'replacement.csv')
+
+    def test_edit_switch_to_url_clears_files(self):
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.post(
+            self.edit_url,
+            {
+                'version_number': '1.0',
+                'description': 'External now',
+                'input_method': 'url',
+                'file_url': 'https://example.com/data.csv',
+                'file_url_description': 'Hosted externally',
+                'file_size_text': '2 MB',
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.files.count(), 0)
+        self.assertEqual(self.version.file_url, 'https://example.com/data.csv')
+        self.assertEqual(self.version.file_size_text, '2 MB')
+
+    def test_owner_can_delete_version(self):
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.post(self.delete_url, follow=True)
+        self.assertRedirects(response, reverse('datasets:dataset_detail', args=[self.dataset.pk]))
+        self.assertFalse(DatasetVersion.objects.filter(pk=self.version.pk).exists())
+
+    def test_author_can_delete_their_version(self):
+        self.client.login(username='versionauthor', password='testpass123')
+        response = self.client.get(self.delete_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'datasets/dataset_version_confirm_delete.html')
+
+    def test_contributor_cannot_delete_version(self):
+        self.client.login(username='versioncontributor', password='testpass123')
+        response = self.client.post(self.delete_url, follow=True)
+        self.assertTrue(DatasetVersion.objects.filter(pk=self.version.pk).exists())
+
+    def test_promote_helper_sets_next_current(self):
+        dataset_id = self.version.dataset_id
+        _clear_version_files(self.version)
+        self.version.delete()
+        _promote_next_dataset_version(dataset_id)
+        self.older_version.refresh_from_db()
+        self.assertTrue(self.older_version.is_current)
+
+    def test_promote_helper_inside_atomic(self):
+        from django.db import transaction
+
+        dataset_id = self.version.dataset_id
+        with transaction.atomic():
+            _clear_version_files(self.version)
+            self.version.delete()
+            _promote_next_dataset_version(dataset_id)
+        self.older_version.refresh_from_db()
+        self.assertTrue(self.older_version.is_current)
+
+    def test_deleting_current_version_promotes_next(self):
+        self.client.login(username='versionowner', password='testpass123')
+        self.assertEqual(
+            DatasetVersion.objects.filter(dataset=self.dataset, is_current=True).count(),
+            1,
+        )
+        response = self.client.post(self.delete_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(DatasetVersion.objects.filter(pk=self.version.pk).exists())
+        self.older_version.refresh_from_db()
+        self.assertTrue(self.older_version.is_current)
+
+    def test_deleting_last_version_is_allowed(self):
+        DatasetVersion.objects.filter(dataset=self.dataset).exclude(pk=self.version.pk).delete()
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.post(self.delete_url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.dataset.versions.count(), 0)
+
+    def test_version_author_can_upload_chunks_after_contributor_access_removed(self):
+        self.dataset.contributors.remove(self.contributor)
+        self.assertFalse(user_can_manage_dataset_versions(self.author, self.dataset))
+        self.assertTrue(user_can_upload_version_chunks(self.author, self.dataset))
+        self.assertTrue(user_can_modify_dataset_version(self.author, self.version))
+
+    def test_dataset_detail_shows_edit_delete_for_owner(self):
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.get(reverse('datasets:dataset_detail', args=[self.dataset.pk]))
+        self.assertContains(response, self.edit_url)
+        self.assertContains(response, self.delete_url)
 
 
 class PublisherModelTests(TestCase):

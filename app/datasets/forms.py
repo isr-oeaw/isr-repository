@@ -233,7 +233,7 @@ class MultiFileField(forms.FileField):
 
 
 class DatasetVersionForm(forms.ModelForm):
-    """Form for creating new dataset versions"""
+    """Form for creating and editing dataset versions"""
     
     # Add a choice field for input method
     input_method = forms.ChoiceField(
@@ -303,14 +303,25 @@ class DatasetVersionForm(forms.ModelForm):
         # Set initial field order
         self.fields['input_method'].label = 'File Input Method'
 
+        if self.instance.pk:
+            if self.instance.file_url or self.instance.file_url_description:
+                self.fields['input_method'].initial = 'url'
+            elif self.instance.has_file():
+                self.fields['input_method'].initial = 'upload'
+            self.fields['files'].help_text += (
+                ' When editing, leave empty to keep the current uploaded files.'
+            )
+
     def clean_version_number(self):
         version_number = self.cleaned_data.get('version_number')
         if version_number and self.dataset:
-            # Check if version number already exists for this dataset
-            if DatasetVersion.objects.filter(
-                dataset=self.dataset, 
-                version_number=version_number
-            ).exists():
+            queryset = DatasetVersion.objects.filter(
+                dataset=self.dataset,
+                version_number=version_number,
+            )
+            if self.instance.pk:
+                queryset = queryset.exclude(pk=self.instance.pk)
+            if queryset.exists():
                 raise forms.ValidationError(
                     f'Version {version_number} already exists for this dataset.'
                 )
@@ -356,8 +367,12 @@ class DatasetVersionForm(forms.ModelForm):
                 cleaned_data['upload_id'] = upload_id
                 self.instance.file_size = total_upload_size
             elif not uploaded_files:
-                self.add_error('files', 'Please upload at least one file when using the upload method.')
-                raise forms.ValidationError('Please upload at least one file when using the upload method.')
+                if self.instance.pk and self.instance.has_file():
+                    cleaned_data['keep_existing_files'] = True
+                    total_upload_size = self.instance.file_size or 0
+                else:
+                    self.add_error('files', 'Please upload at least one file when using the upload method.')
+                    raise forms.ValidationError('Please upload at least one file when using the upload method.')
             else:
                 max_upload_size = settings.MAX_DATASET_UPLOAD_SIZE
                 max_upload_gb = max_upload_size // (1024 * 1024 * 1024)

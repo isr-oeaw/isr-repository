@@ -38,6 +38,23 @@ def user_can_manage_dataset_versions(user, dataset):
     )
 
 
+def user_can_modify_dataset_version(user, version):
+    """Return True if the user may edit or delete a specific version."""
+    dataset = version.dataset
+    return (
+        user == dataset.owner
+        or user.is_superuser
+        or user == version.created_by
+    )
+
+
+def user_can_upload_version_chunks(user, dataset):
+    """Return True if the user may stage chunked uploads for version create/edit."""
+    if user_can_manage_dataset_versions(user, dataset):
+        return True
+    return DatasetVersion.objects.filter(dataset=dataset, created_by=user).exists()
+
+
 @login_required
 def upload_dataset_version_chunk(request, dataset_pk):
     """Append one chunk to a staged dataset version upload."""
@@ -45,7 +62,7 @@ def upload_dataset_version_chunk(request, dataset_pk):
         return JsonResponse({'success': False, 'error': 'POST required.'}, status=405)
 
     dataset = get_object_or_404(Dataset, pk=dataset_pk)
-    if not user_can_manage_dataset_versions(request.user, dataset):
+    if not user_can_upload_version_chunks(request.user, dataset):
         return JsonResponse({'success': False, 'error': 'Permission denied.'}, status=403)
 
     upload_id = request.POST.get('upload_id')
@@ -469,11 +486,111 @@ def dataset_statistics(request):
     return render(request, 'datasets/statistics.html', {'stats': stats})
 
 
-class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
-    """Create a new version for a dataset"""
-    model = DatasetVersion
+def _clear_version_files(version):
+    """Remove all uploaded files associated with a version."""
+    for attachment in list(version.files.all()):
+        attachment.file.delete(save=False)
+        attachment.delete()
+    if version.file:
+        version.file.delete(save=False)
+        version.file = None
+
+
+def _save_version_upload_files(version, uploaded_files):
+    """Persist uploaded files as version attachments."""
+    for upload in uploaded_files:
+        DatasetVersionFile.objects.create(
+            version=version,
+            file=upload,
+            file_size=upload.size,
+            original_name=upload.name,
+        )
+
+
+def _promote_next_dataset_version(dataset_id):
+    """Mark the newest remaining version as current if none are current."""
+    if not DatasetVersion.objects.filter(dataset_id=dataset_id).exists():
+        return
+    if DatasetVersion.objects.filter(dataset_id=dataset_id, is_current=True).exists():
+        return
+    next_version_id = (
+        DatasetVersion.objects.filter(dataset_id=dataset_id)
+        .order_by('-created_at')
+        .values_list('pk', flat=True)
+        .first()
+    )
+    if next_version_id:
+        DatasetVersion.objects.filter(pk=next_version_id).update(is_current=True)
+
+
+class DatasetVersionFormMixin:
+    """Shared behaviour for dataset version create and update forms."""
+
     form_class = DatasetVersionForm
     template_name = 'datasets/dataset_version_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['dataset'] = self.dataset
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_success_url(self):
+        return reverse('datasets:dataset_detail', kwargs={'pk': self.dataset.pk})
+
+    def get_context_data(self, **kwargs):
+        from django.conf import settings
+
+        context = super().get_context_data(**kwargs)
+        context['dataset'] = self.dataset
+        context['max_dataset_upload_size'] = settings.MAX_DATASET_UPLOAD_SIZE
+        context['chunk_upload_url'] = reverse(
+            'datasets:dataset_version_upload_chunk',
+            kwargs={'dataset_pk': self.dataset.pk},
+        )
+        return context
+
+    def form_invalid(self, form):
+        import logging
+        logger = logging.getLogger('django')
+
+        error_messages = []
+        for field, errors in form.errors.items():
+            for error in errors:
+                error_msg = f'Form error - {field}: {error}'
+                error_messages.append(error_msg)
+                logger.warning(error_msg)
+
+        for error in form.non_field_errors():
+            error_msg = f'Form error (non-field): {error}'
+            error_messages.append(error_msg)
+            logger.warning(error_msg)
+
+        messages.error(self.request, 'Please correct the errors below.')
+
+        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.http import JsonResponse
+            from django.conf import settings
+
+            formatted_errors = {}
+            for field, errors in form.errors.items():
+                formatted_errors[field] = errors
+
+            return JsonResponse({
+                'success': False,
+                'error': 'Form validation failed. Please check the errors below.',
+                'errors': formatted_errors,
+                'non_field_errors': form.non_field_errors(),
+                'error_messages': error_messages,
+                'error_details': '\n'.join(error_messages) if settings.DEBUG else None
+            }, status=400)
+
+        return super().form_invalid(form)
+
+
+class DatasetVersionCreateView(LoginRequiredMixin, DatasetVersionFormMixin, CreateView):
+    """Create a new version for a dataset"""
+    model = DatasetVersion
 
     def dispatch(self, request, *args, **kwargs):
         # Get the dataset and check permissions
@@ -487,12 +604,6 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
             return redirect('datasets:dataset_detail', pk=self.dataset.pk)
         
         return super().dispatch(request, *args, **kwargs)
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['dataset'] = self.dataset
-        kwargs['user'] = self.request.user
-        return kwargs
 
     def form_valid(self, form):
         import logging
@@ -531,20 +642,8 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
                 self.object.save()
                 logger.info(f'Dataset version {self.object.version_number} (ID: {self.object.pk}) created successfully')
 
-                # Persist uploaded files as separate attachments
-                if input_method == 'upload':
-                    for idx, upload in enumerate(uploaded_files):
-                        try:
-                            DatasetVersionFile.objects.create(
-                                version=self.object,
-                                file=upload,
-                                file_size=upload.size,
-                                original_name=upload.name,
-                            )
-                            logger.debug(f'File {idx+1}/{len(uploaded_files)} uploaded: {upload.name} ({upload.size} bytes)')
-                        except Exception as e:
-                            logger.error(f'Error saving file {upload.name}: {str(e)}', exc_info=True)
-                            raise
+                if input_method == 'upload' and uploaded_files:
+                    _save_version_upload_files(self.object, uploaded_files)
 
             if upload_id:
                 remove_chunk_upload(self.request.user.pk, upload_id)
@@ -587,61 +686,143 @@ class DatasetVersionCreateView(LoginRequiredMixin, CreateView):
             messages.error(self.request, f'An error occurred while creating the version: {str(e)}')
             return self.form_invalid(form)
 
-    def form_invalid(self, form):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_edit'] = False
+        return context
+
+
+class DatasetVersionUpdateView(LoginRequiredMixin, DatasetVersionFormMixin, UpdateView):
+    """Edit an existing dataset version."""
+
+    model = DatasetVersion
+    context_object_name = 'version'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.dataset = get_object_or_404(Dataset, pk=kwargs['dataset_pk'])
+        self.object = get_object_or_404(
+            DatasetVersion,
+            pk=kwargs['pk'],
+            dataset=self.dataset,
+        )
+        if not user_can_modify_dataset_version(request.user, self.object):
+            messages.error(request, 'You do not have permission to edit this version.')
+            return redirect('datasets:dataset_detail', pk=self.dataset.pk)
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
         import logging
         logger = logging.getLogger('django')
-        
-        # Log form errors
-        error_messages = []
-        for field, errors in form.errors.items():
-            for error in errors:
-                error_msg = f'Form error - {field}: {error}'
-                error_messages.append(error_msg)
-                logger.warning(error_msg)
-        
-        # Log non-field errors
-        for error in form.non_field_errors():
-            error_msg = f'Form error (non-field): {error}'
-            error_messages.append(error_msg)
-            logger.warning(error_msg)
-        
-        messages.error(self.request, 'Please correct the errors below.')
-        
-        # Handle AJAX requests
-        if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            from django.http import JsonResponse
-            from django.conf import settings
-            
-            # Format errors for JSON response
-            formatted_errors = {}
-            for field, errors in form.errors.items():
-                formatted_errors[field] = errors
-            
-            return JsonResponse({
-                'success': False,
-                'error': 'Form validation failed. Please check the errors below.',
-                'errors': formatted_errors,
-                'non_field_errors': form.non_field_errors(),
-                'error_messages': error_messages,
-                'error_details': '\n'.join(error_messages) if settings.DEBUG else None
-            }, status=400)
-        
-        return super().form_invalid(form)
+
+        try:
+            input_method = form.cleaned_data.get('input_method')
+            uploaded_files = form.cleaned_data.get('uploaded_files', [])
+            total_upload_size = form.cleaned_data.get('uploaded_files_total_size', 0)
+            upload_id = form.cleaned_data.get('upload_id')
+            keep_existing_files = form.cleaned_data.get('keep_existing_files', False)
+
+            with transaction.atomic():
+                self.object = form.save(commit=False)
+
+                if input_method == 'upload':
+                    self.object.file_url = ''
+                    self.object.file_url_description = ''
+                    self.object.file_size_text = ''
+
+                    if uploaded_files:
+                        _clear_version_files(self.object)
+                        self.object.file_size = total_upload_size
+                        self.object.save()
+                        _save_version_upload_files(self.object, uploaded_files)
+                    elif keep_existing_files:
+                        self.object.save()
+                    else:
+                        self.object.file_size = total_upload_size
+                        self.object.save()
+                else:
+                    _clear_version_files(self.object)
+                    self.object.file_size = 0
+                    self.object.save()
+
+            if upload_id:
+                remove_chunk_upload(self.request.user.pk, upload_id)
+
+            messages.success(
+                self.request,
+                f'Version {self.object.version_number} updated successfully!',
+            )
+
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'success': True,
+                    'redirect_url': self.get_success_url(),
+                })
+
+            return redirect(self.get_success_url())
+        except Exception as e:
+            logger.error(f'Error updating dataset version: {str(e)}', exc_info=True)
+
+            if self.request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                from django.conf import settings
+                import traceback
+                error_details = str(e)
+                if hasattr(e, '__traceback__'):
+                    error_details += f"\n\nTraceback:\n{traceback.format_exc()}"
+                return JsonResponse({
+                    'success': False,
+                    'error': f'An error occurred while updating the version: {str(e)}',
+                    'error_details': error_details if settings.DEBUG else None
+                }, status=500)
+
+            messages.error(self.request, f'An error occurred while updating the version: {str(e)}')
+            return self.form_invalid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['is_edit'] = True
+        context['existing_attachments'] = list(self.object.files.all())
+        return context
+
+
+class DatasetVersionDeleteView(LoginRequiredMixin, DeleteView):
+    """Delete a dataset version."""
+
+    model = DatasetVersion
+    template_name = 'datasets/dataset_version_confirm_delete.html'
+    context_object_name = 'version'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.dataset = get_object_or_404(Dataset, pk=kwargs['dataset_pk'])
+        self.object = get_object_or_404(
+            DatasetVersion,
+            pk=kwargs['pk'],
+            dataset=self.dataset,
+        )
+        if not user_can_modify_dataset_version(request.user, self.object):
+            messages.error(request, 'You do not have permission to delete this version.')
+            return redirect('datasets:dataset_detail', pk=self.dataset.pk)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse('datasets:dataset_detail', kwargs={'pk': self.dataset.pk})
 
     def get_context_data(self, **kwargs):
-        from django.conf import settings
-
         context = super().get_context_data(**kwargs)
         context['dataset'] = self.dataset
-        context['max_dataset_upload_size'] = settings.MAX_DATASET_UPLOAD_SIZE
-        context['chunk_upload_url'] = reverse(
-            'datasets:dataset_version_upload_chunk',
-            kwargs={'dataset_pk': self.dataset.pk},
-        )
         return context
+
+    def form_valid(self, form):
+        version = self.object
+        version_number = version.version_number
+        dataset_id = version.dataset_id
+
+        with transaction.atomic():
+            _clear_version_files(version)
+            version.delete()
+            _promote_next_dataset_version(dataset_id)
+
+        messages.success(self.request, f'Version {version_number} deleted successfully!')
+        return redirect(self.get_success_url())
 
 
 # Category Views
