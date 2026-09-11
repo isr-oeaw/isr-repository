@@ -1191,6 +1191,17 @@ class ExternalPartnerTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Assigned Dataset')
 
+    def test_owner_sees_collapsible_invite_partner_form(self):
+        """Project owner sees invite button and collapsed partner form on detail page."""
+        self.client.login(username='owner', password='testpass123')
+        response = self.client.get(
+            reverse('projects:project_detail', kwargs={'pk': self.assigned_project.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Invite project partner')
+        self.assertContains(response, 'id="invite-project-partner"')
+        self.assertContains(response, 'class="collapse"')
+
     def test_owner_can_invite_new_partner(self):
         """Invite creates External Partner, adds collaborator, and sends login email."""
         from django.core import mail
