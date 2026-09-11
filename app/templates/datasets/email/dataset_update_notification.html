@@ -1,24 +1,11 @@
 {% extends "account/email/base_message.html" %}
 {% load i18n %}
 
-{% block header_bg %}#001A70{% endblock %}
-{% block accent_color %}#92C1E9{% endblock %}
-{% block heading_color %}#001A70{% endblock %}
-{% block link_color %}#001A70{% endblock %}
-
 {% block title %}{% trans "Dataset Updated" %} - {{ site_name }}{% endblock %}
 
-{% block header %}
-<h1 style="margin: 0; font-size: 20px; font-weight: 600; color: #FFFFFF;">{% trans "Dataset Updated" %}</h1>
-{% endblock %}
-
-{% block header_accent %}
-<tr>
-    <td style="background-color: #92C1E9; height: 6px; font-size: 0; line-height: 0;">&nbsp;</td>
-</tr>
-{% endblock %}
-
 {% block content %}
+<h1 class="email-title">{% trans "Dataset Updated" %}</h1>
+
 <p style="margin: 0 0 16px 0;">{% trans "Hello" %}{% if user.first_name %}, {{ user.first_name }}{% endif %},</p>
 
 <p style="margin: 0 0 24px 0;">{% blocktrans with dataset_title=dataset.title %}The dataset <strong>{{ dataset_title }}</strong> has been updated. Review the latest metadata and files on the platform.{% endblocktrans %}</p>
@@ -30,11 +17,11 @@
     {% endif %}
     <p style="margin: 0;">
         {% if dataset.category %}
-        <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#1A1A1A{% else %}#FFFFFF{% endif %}; padding: 4px 10px; border-radius: 4px; font-size: 13px; margin-right: 8px;">
+        <span style="display: inline-block; background-color: {{ dataset.category.color }}; color: {% if dataset.category.color == '#ffffff' or dataset.category.color == '#fff' %}#0b0b0b{% else %}#ffffff{% endif %}; padding: 4px 10px; border-radius: 10px; font-size: 13px; margin-right: 8px;">
             {{ dataset.category.name }}
         </span>
         {% endif %}
-        <span style="display: inline-block; background-color: #555555; color: #FFFFFF; padding: 4px 10px; border-radius: 4px; font-size: 13px;">
+        <span style="display: inline-block; background-color: #52514e; color: #ffffff; padding: 4px 10px; border-radius: 10px; font-size: 13px;">
             {{ dataset.get_status_display }}
         </span>
     </p>
@@ -43,7 +30,7 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td align="center" style="padding: 8px 0 24px 0;">
-            <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #001A70; color: #FFFFFF;">
+            <a href="{{ site_url }}{% url 'datasets:dataset_detail' dataset.pk %}" class="btn" style="background-color: #0047BB; color: #ffffff;">
                 {% trans "View Dataset" %}
             </a>
         </td>
@@ -52,6 +39,6 @@
 
 <p class="meta" style="margin: 24px 0 0 0; font-size: 14px; text-align: center;">
     {% trans "Manage notification preferences:" %}
-    <a href="{{ settings_url }}" style="color: #001A70;">{{ settings_url }}</a>
+    <a href="{{ settings_url }}" style="color: #0047BB;">{{ settings_url }}</a>
 </p>
 {% endblock content %}
