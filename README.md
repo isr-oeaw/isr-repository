@@ -130,6 +130,49 @@ docker compose exec app python manage.py test
 docker compose exec app python manage.py test --verbosity=2
 ```
 
+## MCP and API keys
+
+The MCP endpoint is available at `/mcp` (JSON-RPC over POST). Authentication uses an API key from **Settings → API keys** in the app. The full key is shown only once when created.
+
+Send the key on every POST request using one of:
+
+- `Authorization: Bearer <your-api-key>` (recommended for Claude and other MCP clients)
+- `Authorization: Api-Key <your-api-key>`
+- Query parameter `?api_key=<your-api-key>` (works but may appear in access logs)
+
+A `401 Unauthorized` on `/mcp` means the request reached the app without a valid key (revoked, expired, or missing header). GET `/mcp` returns `405` and does not require authentication.
+
+### Verify MCP from the terminal
+
+```bash
+# Local (via nginx)
+MCP_URL=http://localhost/mcp API_KEY=your_full_key ./scripts/verify_mcp.sh
+
+# Production
+MCP_URL=https://isrrepository.dataplexity.eu/mcp API_KEY=your_full_key ./scripts/verify_mcp.sh
+```
+
+The script checks: GET reachability (405), unauthenticated POST (401), then `initialize`, `tools/list`, and `ping` with your Bearer key.
+
+Manual initialize example:
+
+```bash
+curl -sS -X POST 'https://isrrepository.dataplexity.eu/mcp' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+### List API keys on the server (prefix only)
+
+```bash
+docker compose exec app python manage.py shell -c "
+from user.models import APIKey
+for k in APIKey.objects.select_related('user').all():
+    print(k.prefix, k.name, k.user.username, k.is_active, k.expires_at, k.last_used_at)
+"
+```
+
 ## 🗄️ Database
 
 The application uses PostgreSQL with PostGIS extension for geospatial data support.
