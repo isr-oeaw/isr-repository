@@ -43,10 +43,12 @@
                             <li><a class="dropdown-item" href="{% url 'user-settings' %}">{% trans "Settings" %}</a></li>
                             <li><a class="dropdown-item" href="{% url 'documentation' %}">{% trans "Documentation" %}</a></li>
                             {% if user.is_superuser or user.role.name == 'Administrator' %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><h6 class="dropdown-header">{% trans "Admin" %}</h6></li>
                             <li><a class="dropdown-item" href="{% url 'user-list' %}">{% trans "Users" %}</a></li>
-                            {% endif %}
                             {% if user.is_superuser %}
                             <li><a class="dropdown-item" href="{% url 'logs' %}">{% trans "Logs" %}</a></li>
+                            {% endif %}
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'account_logout' %}">{% trans "Logout" %}</a></li>

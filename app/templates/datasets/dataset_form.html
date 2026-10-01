@@ -295,10 +295,18 @@
                         <div class="row">
                             <div class="col-12">
                                 <div class="d-flex justify-content-between">
-                                    <a href="{% url 'datasets:dataset_list' %}" class="btn btn-outline-secondary">
-                                        <i class="bi bi-x-circle me-2"></i>
-                                        {% trans "Cancel" %}
-                                    </a>
+                                    <div>
+                                        <a href="{% url 'datasets:dataset_list' %}" class="btn btn-outline-secondary">
+                                            <i class="bi bi-x-circle me-2"></i>
+                                            {% trans "Cancel" %}
+                                        </a>
+                                        {% if object and user.is_superuser %}
+                                        <a href="{% url 'datasets:dataset_delete' object.pk %}" class="btn btn-outline-danger ms-2">
+                                            <i class="bi bi-trash me-2"></i>
+                                            {% trans "Delete" %}
+                                        </a>
+                                        {% endif %}
+                                    </div>
                                     <button type="submit" class="btn btn-primary">
                                         {% if object %}
                                             <i class="bi bi-check-circle me-2"></i>

@@ -1996,6 +1996,31 @@ class DatasetDeleteViewTests(TestCase):
         self.assertTemplateUsed(response, 'datasets/dataset_confirm_delete.html')
         self.assertContains(response, 'Delete Dataset')
         self.assertContains(response, self.dataset1.title)
+
+    def test_superuser_sees_delete_on_edit_form_not_on_detail(self):
+        """Delete link is on the edit form, not the dataset detail page."""
+        self.client.login(username='superuser', password='testpass123')
+        delete_url = reverse('datasets:dataset_delete', kwargs={'pk': self.dataset1.pk})
+        detail_url = reverse('datasets:dataset_detail', kwargs={'pk': self.dataset1.pk})
+        edit_url = reverse('datasets:dataset_edit', kwargs={'pk': self.dataset1.pk})
+
+        detail_response = self.client.get(detail_url)
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertNotContains(detail_response, delete_url)
+
+        edit_response = self.client.get(edit_url)
+        self.assertEqual(edit_response.status_code, 200)
+        self.assertContains(edit_response, delete_url)
+
+    def test_dataset_owner_does_not_see_delete_on_edit_form(self):
+        """Non-superusers who can edit do not see the delete link on the edit form."""
+        self.client.login(username='regularuser', password='testpass123')
+        delete_url = reverse('datasets:dataset_delete', kwargs={'pk': self.dataset1.pk})
+        edit_url = reverse('datasets:dataset_edit', kwargs={'pk': self.dataset1.pk})
+
+        response = self.client.get(edit_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, delete_url)
     
     def test_superuser_can_delete_dataset(self):
         """Test that superuser can successfully delete a dataset"""
