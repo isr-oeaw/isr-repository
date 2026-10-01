@@ -150,9 +150,10 @@
                                 <li>{{ attachment.display_name }} ({{ attachment.file_size|filesizeformat }})</li>
                                 {% endfor %}
                             </ul>
-                            <p class="mb-0 mt-2 text-muted small">{% trans "Upload new files below to replace the current attachments." %}</p>
+                            <p class="mb-0 mt-2 text-muted small">{% trans "These files stay attached when you save. Upload new files below only if you want to replace them." %}</p>
                             {% elif version.file %}
                             <p class="mb-0 mt-2">{{ version.file.name|slice:"-50:" }}</p>
+                            <p class="mb-0 mt-2 text-muted small">{% trans "This file stays attached when you save. Upload a new file below only if you want to replace it." %}</p>
                             {% elif version.file_url %}
                             <p class="mb-0 mt-2"><a href="{{ version.file_url }}" target="_blank" rel="noopener">{{ version.file_url }}</a></p>
                             {% elif version.file_url_description %}
@@ -342,6 +343,8 @@ const MAX_DATASET_UPLOAD_SIZE_GB = Math.round(MAX_DATASET_UPLOAD_SIZE / (1024 * 
 const CHUNK_UPLOAD_URL = '{{ chunk_upload_url|escapejs }}';
 const CHUNK_SIZE = 8 * 1024 * 1024;
 const CHUNKED_UPLOAD_THRESHOLD = 32 * 1024 * 1024;
+const IS_EDIT = {{ is_edit|yesno:"true,false" }};
+const HAS_CURRENT_UPLOAD = {% if is_edit %}{% if existing_attachments or version.file %}true{% else %}false{% endif %}{% else %}false{% endif %};
 
 function validateUploadSize(files) {
     const fileList = Array.from(files || []);
@@ -411,7 +414,7 @@ function toggleFileInput() {
     if (uploadRadio.checked) {
         fileUploadSection.style.display = 'block';
         urlSection.style.display = 'none';
-        fileInput.required = true;
+        fileInput.required = !IS_EDIT || !HAS_CURRENT_UPLOAD;
         urlInput.required = false;
         urlDescInput.required = false;
         sizeInput.required = false;

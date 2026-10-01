@@ -80,32 +80,6 @@
                 </div>
             </div>
 
-            <!-- Dataset Statistics -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-bar-chart me-2"></i>
-                        {% trans "Dataset Statistics" %}
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>{% trans "Downloads" %}:</strong> {{ dataset.download_count }}</p>
-                            <p><strong>{% trans "Versions" %}:</strong> {{ dataset.versions.count }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>{% trans "Views" %}:</strong> {{ dataset.view_count }}</p>
-                            <p><strong>{% trans "Status" %}:</strong> 
-                                <span class="badge bg-{% if dataset.status == 'published' %}success{% elif dataset.status == 'draft' %}warning{% else %}secondary{% endif %}">
-                                    {{ dataset.get_status_display }}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Tags -->
             {% if dataset.get_tags_list %}
             <div class="card mb-4">
@@ -197,6 +171,111 @@
                         </a>
                     </div>
                     {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Dataset Versions -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h4 mb-0">
+                    <i class="bi bi-collection me-2"></i>
+                    {% trans "Dataset Versions" %}
+                </h3>
+                {% if user.is_authenticated and user.is_superuser or user == dataset.owner or user in dataset.contributors.all %}
+                <a href="{% url 'datasets:dataset_version_create' dataset.pk %}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    {% trans "Add New Version" %}
+                </a>
+                {% endif %}
+            </div>
+            {% if dataset.versions.exists %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{% trans "Version" %}</th>
+                                    <th>{% trans "File Size" %}</th>
+                                    <th>{% trans "Created At" %}</th>
+                                    <th>{% trans "Actions" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for version in dataset.versions.all %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">v{{ version.version_number }}</span>
+                                        {% if version.is_current %}
+                                        <span class="badge bg-success ms-1">{% trans "Latest" %}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ version.get_file_size_display }}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ version.created_at|date:"M d, Y H:i" }}</small>
+                                    </td>
+                                    {% with attachments=version.files.all %}
+                                    <td>
+                                        <div class="d-flex flex-column gap-2">
+                                            {% if attachments %}
+                                                {% for attachment in attachments %}
+                                                    <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}&file={{ attachment.id }}"
+                                                       class="btn btn-outline-primary btn-sm text-start"
+                                                       title="{% trans 'Download this file' %}">
+                                                        <i class="bi bi-download me-2"></i>
+                                                        {{ attachment.display_name }}
+                                                    </a>
+                                                {% endfor %}
+                                            {% elif version.file %}
+                                                <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}"
+                                                   class="btn btn-outline-primary btn-sm"
+                                                   title="{% trans 'Download this version' %}">
+                                                    <i class="bi bi-download"></i>
+                                                </a>
+                                            {% elif version.file_url %}
+                                                <a href="{{ version.file_url }}"
+                                                   class="btn btn-outline-info btn-sm"
+                                                   target="_blank"
+                                                   title="{% trans 'Open external URL' %}">
+                                                    <i class="bi bi-box-arrow-up-right"></i>
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">{% trans "No file" %}</span>
+                                            {% endif %}
+                                            {% if user.is_authenticated %}
+                                                {% if user.is_superuser or user == dataset.owner or user == version.created_by %}
+                                                <div class="d-flex gap-2 mt-1">
+                                                    <a href="{% url 'datasets:dataset_version_edit' dataset.pk version.pk %}"
+                                                       class="btn btn-outline-secondary btn-sm"
+                                                       title="{% trans 'Edit version' %}">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a href="{% url 'datasets:dataset_version_delete' dataset.pk version.pk %}"
+                                                       class="btn btn-outline-danger btn-sm"
+                                                       title="{% trans 'Delete version' %}">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    {% endwith %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-collection text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3 text-muted">{% trans "No versions yet" %}</h5>
+                    <p class="text-muted mb-0">{% trans "This dataset doesn't have any versions yet." %}</p>
                 </div>
             </div>
             {% endif %}
@@ -310,7 +389,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    <div class="row text-center">
+                    <div class="row text-center g-3">
                         <div class="col-6">
                             <div class="border-end">
                                 <h4 class="text-primary mb-1">{{ dataset.download_count }}</h4>
@@ -321,180 +400,33 @@
                             <h4 class="text-info mb-1">{{ dataset.versions.count }}</h4>
                             <small class="text-muted">{% trans "Versions" %}</small>
                         </div>
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h4 class="text-secondary mb-1">{{ dataset.view_count }}</h4>
+                                <small class="text-muted">{% trans "Views" %}</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <span class="badge
+                                {% if dataset.status == 'published' %}bg-success
+                                {% elif dataset.status == 'draft' %}bg-warning
+                                {% elif dataset.status == 'archived' %}bg-secondary
+                                {% else %}bg-info{% endif %}">
+                                {{ dataset.get_status_display }}
+                            </span>
+                            <div><small class="text-muted">{% trans "Status" %}</small></div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Dataset Versions -->
-    <div class="row mt-5">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="h4 mb-0">
-                    <i class="bi bi-collection me-2"></i>
-                    {% trans "Dataset Versions" %}
-                </h3>
-                {% if user.is_authenticated and user.is_superuser or user == dataset.owner or user in dataset.contributors.all %}
-                <a href="{% url 'datasets:dataset_version_create' dataset.pk %}" class="btn btn-outline-primary">
-                    <i class="bi bi-plus-circle me-2"></i>
-                    {% trans "Add New Version" %}
-                </a>
-                {% endif %}
-            </div>
-    {% if dataset.versions.exists %}
-            <div class="card">
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>{% trans "Version" %}</th>
-                                    <th>{% trans "Description" %}</th>
-                                    <th>{% trans "File Size" %}</th>
-                                    <th>{% trans "File Source" %}</th>
-                                    <th>{% trans "Created By" %}</th>
-                                    <th>{% trans "Created At" %}</th>
-                                    <th>{% trans "Actions" %}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for version in dataset.versions.all %}
-                                <tr>
-                                    <td>
-                                        <span class="badge bg-primary">v{{ version.version_number }}</span>
-                                        {% if version.is_current %}
-                                        <span class="badge bg-success ms-1">{% trans "Latest" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if version.description %}
-                                            {{ version.description|truncatechars:100 }}
-                                        {% else %}
-                                            <span class="text-muted">{% trans "No description" %}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {{ version.get_file_size_display }}
-                                    </td>
-                                    {% with attachments=version.files.all %}
-                                    <td>
-                                        {% if attachments %}
-                                            <span class="badge bg-primary">
-                                                <i class="bi bi-upload me-1"></i>
-                                                {% trans "Uploaded files" %} ({{ attachments|length }})
-                                            </span>
-                                            {% if attachments|length > 1 %}
-                                                <div class="small text-muted mt-1">
-                                                    {{ attachments|length }} {% trans "files attached" %}
-                                                </div>
-                                            {% endif %}
-                                        {% elif version.file %}
-                                            <span class="badge bg-primary">
-                                                <i class="bi bi-upload me-1"></i>
-                                                {% trans "Uploaded" %}
-                                            </span>
-                                        {% elif version.file_url or version.file_url_description %}
-                                            <div>
-                                                <span class="badge bg-info">
-                                                    <i class="bi bi-link-45deg me-1"></i>
-                                                    {% trans "External" %}
-                                                </span>
-                                                {% if version.file_url_description %}
-                                                    <div class="small text-muted mt-1">
-                                                        {{ version.file_url_description|truncatechars:50 }}
-                                                    </div>
-                                                {% endif %}
-                                            </div>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if version.created_by %}
-                                            {{ version.created_by.get_full_name|default:version.created_by.username }}
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">{{ version.created_at|date:"M d, Y H:i" }}</small>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex flex-column gap-2">
-                                            {% if attachments %}
-                                                {% for attachment in attachments %}
-                                                    <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}&file={{ attachment.id }}"
-                                                       class="btn btn-outline-primary btn-sm text-start"
-                                                       title="{% trans 'Download this file' %}">
-                                                        <i class="bi bi-download me-2"></i>
-                                                        {{ attachment.display_name }}
-                                                    </a>
-                                                {% endfor %}
-                                            {% elif version.file %}
-                                                <a href="{% url 'datasets:dataset_download' dataset.pk %}?version={{ version.id }}"
-                                                   class="btn btn-outline-primary btn-sm"
-                                                   title="{% trans 'Download this version' %}">
-                                                    <i class="bi bi-download"></i>
-                                                </a>
-                                            {% elif version.file_url %}
-                                                <a href="{{ version.file_url }}"
-                                                   class="btn btn-outline-info btn-sm"
-                                                   target="_blank"
-                                                   title="{% trans 'Open external URL' %}">
-                                                    <i class="bi bi-box-arrow-up-right"></i>
-                                                </a>
-                                            {% else %}
-                                                <span class="text-muted">{% trans "No file" %}</span>
-                                            {% endif %}
-                                            {% if user.is_authenticated %}
-                                                {% if user.is_superuser or user == dataset.owner or user == version.created_by %}
-                                                <div class="d-flex gap-2 mt-1">
-                                                    <a href="{% url 'datasets:dataset_version_edit' dataset.pk version.pk %}"
-                                                       class="btn btn-outline-secondary btn-sm"
-                                                       title="{% trans 'Edit version' %}">
-                                                        <i class="bi bi-pencil"></i>
-                                                    </a>
-                                                    <a href="{% url 'datasets:dataset_version_delete' dataset.pk version.pk %}"
-                                                       class="btn btn-outline-danger btn-sm"
-                                                       title="{% trans 'Delete version' %}">
-                                                        <i class="bi bi-trash"></i>
-                                                    </a>
-                                                </div>
-                                                {% endif %}
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                    {% endwith %}
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-    {% else %}
-            <div class="card">
-                <div class="card-body text-center py-5">
-                    <i class="bi bi-collection text-muted" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3 text-muted">{% trans "No versions yet" %}</h5>
-                    <p class="text-muted">{% trans "This dataset doesn't have any versions yet." %}</p>
-                </div>
-            </div>
-    {% endif %}
-        </div>
-    </div>
-
-    <!-- Comments Section -->
-    <div class="row mt-5">
-        <div class="col-12">
-            <h3 class="h4 mb-3">
+            <!-- Comments Section -->
+            <h3 class="h5 mb-3">
                 <i class="bi bi-chat-dots me-2"></i>
                 {% trans "Comments" %}
                 <span class="badge bg-secondary ms-2">{{ comments.count }}</span>
             </h3>
-            
-            <!-- Add Comment Form -->
+
             {% if user.is_authenticated %}
             <div class="card mb-4">
                 <div class="card-header">
@@ -528,8 +460,7 @@
                 {% trans "Please" %} <a href="{% url 'account_login' %}">{% trans "log in" %}</a> {% trans "to add a comment." %}
             </div>
             {% endif %}
-            
-            <!-- Comments List -->
+
             {% if comments %}
                 {% for comment in comments %}
                 <div class="card mb-3">
@@ -571,11 +502,11 @@
                 </div>
                 {% endfor %}
             {% else %}
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-chat-dots text-muted" style="font-size: 2rem;"></i>
                     <h5 class="mt-3 text-muted">{% trans "No comments yet" %}</h5>
-                    <p class="text-muted">{% trans "Be the first to share your thoughts about this dataset!" %}</p>
+                    <p class="text-muted mb-0">{% trans "Be the first to share your thoughts about this dataset!" %}</p>
                 </div>
             </div>
             {% endif %}
