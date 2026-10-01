@@ -1310,6 +1310,27 @@ class DatasetVersionEditDeleteTests(TestCase):
         self.assertEqual(self.version.files.count(), 1)
         self.assertEqual(self.version.files.first().original_name, 'data.csv')
 
+    def test_edit_form_does_not_require_file_when_current_upload_exists(self):
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.get(self.edit_url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('const HAS_CURRENT_UPLOAD = true', content)
+        self.assertIn('fileInput.required = !IS_EDIT || !HAS_CURRENT_UPLOAD', content)
+
+    def test_create_form_requires_file_for_upload_method(self):
+        create_url = reverse(
+            'datasets:dataset_version_create',
+            args=[self.dataset.pk],
+        )
+        self.client.login(username='versionowner', password='testpass123')
+        response = self.client.get(create_url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('const IS_EDIT = false', content)
+        self.assertIn('const HAS_CURRENT_UPLOAD = false', content)
+        self.assertIn('fileInput.required = !IS_EDIT || !HAS_CURRENT_UPLOAD', content)
+
     def test_author_can_edit_their_version(self):
         self.client.login(username='versionauthor', password='testpass123')
         response = self.client.get(self.edit_url)
