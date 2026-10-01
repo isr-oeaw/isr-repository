@@ -8,7 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib import messages
 from django.urls import reverse_lazy
 from django.conf import settings
-from django.db.models import Count, Sum, Q
+from django.db.models import Sum, Q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         
         # Get real data from models
         try:
-            from datasets.models import Dataset, DatasetVersion, DatasetCategory
+            from datasets.models import Dataset, DatasetVersion
             from user.models import CustomUser
             from projects.models import Project
             
@@ -69,33 +69,18 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                     created_at__gte=thirty_days_ago,
                     status='published',
                 ).select_related('owner', 'category').order_by('-created_at')[:5]
-                popular_datasets = assigned_datasets.filter(
-                    status='published',
-                ).select_related('owner', 'category', 'publisher').order_by('-download_count')[:5]
                 recent_versions = DatasetVersion.objects.filter(
                     created_at__gte=thirty_days_ago,
                     dataset__in=assigned_datasets,
                 ).select_related('dataset', 'dataset__owner').order_by('-created_at')[:10]
-                categories_with_counts = DatasetCategory.objects.filter(
-                    datasets__in=assigned_datasets,
-                    datasets__status='published',
-                ).annotate(
-                    dataset_count=Count('datasets', filter=Q(datasets__status='published'))
-                ).filter(dataset_count__gt=0).order_by('-dataset_count')[:6]
             else:
                 recent_datasets = Dataset.objects.filter(
                     created_at__gte=thirty_days_ago,
                     status='published',
                 ).select_related('owner', 'category').order_by('-created_at')[:5]
-                popular_datasets = Dataset.objects.filter(
-                    status='published',
-                ).select_related('owner', 'category', 'publisher').order_by('-download_count')[:5]
                 recent_versions = DatasetVersion.objects.filter(
                     created_at__gte=thirty_days_ago,
                 ).select_related('dataset', 'dataset__owner').order_by('-created_at')[:10]
-                categories_with_counts = DatasetCategory.objects.annotate(
-                    dataset_count=Count('datasets', filter=Q(datasets__status='published'))
-                ).filter(dataset_count__gt=0).order_by('-dataset_count')[:6]
             
             # Get user's datasets if logged in
             user_datasets = []
@@ -131,9 +116,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                 'data_volume_display': data_volume_display,
                 'uptime_percentage': uptime_percentage,
                 'recent_datasets': recent_datasets,
-                'popular_datasets': popular_datasets,
                 'recent_versions': recent_versions,
-                'categories_with_counts': categories_with_counts,
                 'user_datasets': user_datasets,
                 'user_recent_activity': user_recent_activity,
                 'thirty_days_ago': thirty_days_ago,
@@ -148,9 +131,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
                 'data_volume_display': '0KB',
                 'uptime_percentage': 0,
                 'recent_datasets': [],
-                'popular_datasets': [],
                 'recent_versions': [],
-                'categories_with_counts': [],
                 'user_datasets': [],
                 'user_recent_activity': [],
                 'thirty_days_ago': timezone.now() - timedelta(days=30),

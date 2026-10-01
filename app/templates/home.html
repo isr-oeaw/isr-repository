@@ -107,7 +107,52 @@
     {% endif %}
 
     <div class="row g-4">
-        <div class="col-md-8">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-person-circle me-2"></i>
+                        {% trans "Your Datasets" %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if user_datasets %}
+                        <div class="list-group list-group-flush">
+                            {% for dataset in user_datasets %}
+                            <a href="{% url 'datasets:dataset_detail' dataset.pk %}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ dataset.title }}</h6>
+                                    <span class="badge {% if dataset.status == 'published' %}bg-success{% elif dataset.status == 'draft' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ dataset.get_status_display }}
+                                    </span>
+                                </div>
+                                <p class="mb-1">{{ dataset.description|truncatechars:50 }}</p>
+                                <small class="text-muted">
+                                    {{ dataset.versions.count }} {% trans "versions" %} • {{ dataset.updated_at|timesince }} {% trans "ago" %}
+                                </small>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="{% url 'datasets:dataset_create' %}" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-plus-circle me-2"></i>
+                                {% trans "Add New Dataset" %}
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <i class="bi bi-person-circle d-block"></i>
+                            <p class="mb-3">{% trans "You have no datasets yet" %}</p>
+                            <a href="{% url 'datasets:dataset_create' %}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-2"></i>
+                                {% trans "Add New Dataset" %}
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
                     <h5 class="mb-0">
@@ -155,112 +200,6 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-star me-2"></i>
-                        {% trans "Popular Datasets" %}
-                    </h5>
-                </div>
-                <div class="card-body">
-                    {% if popular_datasets %}
-                        <div class="list-group list-group-flush">
-                            {% for dataset in popular_datasets %}
-                            <a href="{% url 'datasets:dataset_detail' dataset.pk %}" class="list-group-item list-group-item-action">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ dataset.title }}</h6>
-                                </div>
-                                <p class="mb-1">{{ dataset.description|truncatechars:60 }}</p>
-                                <small class="text-muted">
-                                    {% trans "by" %} {% if dataset.publisher %}{{ dataset.publisher.name }}{% else %}{{ dataset.owner.username }}{% endif %} • {{ dataset.updated_at|timesince }} {% trans "ago" %}
-                                </small>
-                            </a>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="empty-state">
-                            <i class="bi bi-star d-block"></i>
-                            <p class="mb-0">{% trans "No datasets available yet" %}</p>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
     </div>
-
-    {% if categories_with_counts or user_datasets %}
-    <div class="row g-4 mt-1">
-        {% if categories_with_counts %}
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-tags me-2"></i>
-                        {% trans "Dataset Categories" %}
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        {% for category in categories_with_counts %}
-                        <div class="col-md-6 mb-3">
-                            <div class="d-flex align-items-center">
-                                <span class="badge me-2" style="background-color: {{ category.color }}; color: {% if category.color == '#ffffff' or category.color == '#fff' %}#000{% else %}#fff{% endif %};">
-                                    {{ category.name }}
-                                </span>
-                                <small class="text-muted">{{ category.dataset_count }} {% trans "datasets" %}</small>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="text-center mt-2">
-                        <a href="{% url 'datasets:category_list' %}" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-tags me-2"></i>
-                            {% trans "View All Categories" %}
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if user_datasets %}
-        <div class="col-md-6">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="bi bi-person-circle me-2"></i>
-                        {% trans "Your Datasets" %}
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="list-group list-group-flush">
-                        {% for dataset in user_datasets %}
-                        <a href="{% url 'datasets:dataset_detail' dataset.pk %}" class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ dataset.title }}</h6>
-                                <span class="badge {% if dataset.status == 'published' %}bg-success{% elif dataset.status == 'draft' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                    {{ dataset.get_status_display }}
-                                </span>
-                            </div>
-                            <p class="mb-1">{{ dataset.description|truncatechars:50 }}</p>
-                            <small class="text-muted">
-                                {{ dataset.versions.count }} {% trans "versions" %} • {{ dataset.updated_at|timesince }} {% trans "ago" %}
-                            </small>
-                        </a>
-                        {% endfor %}
-                    </div>
-                    <div class="text-center mt-3">
-                        <a href="{% url 'datasets:dataset_create' %}" class="btn btn-outline-success btn-sm">
-                            <i class="bi bi-plus-circle me-2"></i>
-                            {% trans "Add New Dataset" %}
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
