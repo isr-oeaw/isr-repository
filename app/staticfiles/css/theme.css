@@ -550,6 +550,15 @@ footer {
     margin: 0.35rem 0;
 }
 
+.dropdown-header {
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 0.25rem 0.75rem 0.15rem;
+}
+
 /* List groups inside cards */
 .list-group-item {
     border-color: var(--border);
