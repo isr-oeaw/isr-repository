@@ -12,19 +12,36 @@ from django.db.models import Q, Count
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db import transaction
+from django.core.exceptions import ValidationError
 from pathlib import Path
 
 from .models import (
     Dataset,
     DatasetCategory,
     DatasetVersion,
+    DatasetVersionColumn,
     DatasetVersionFile,
     DatasetDownload,
     Comment,
     Publisher,
     DatasetAnalysis,
 )
-from .forms import DatasetForm, DatasetFilterForm, DatasetVersionForm, DatasetCategoryForm, DatasetCategoryFilterForm, CommentForm, CommentEditForm, PublisherForm, PublisherFilterForm, DatasetProjectAssignmentForm, DatasetAnalysisForm
+from .forms import (
+    DatasetForm,
+    DatasetFilterForm,
+    DatasetVersionForm,
+    DatasetVersionColumnFormSet,
+    column_formset_initial_from_version,
+    data_description_initial_from_version,
+    DatasetCategoryForm,
+    DatasetCategoryFilterForm,
+    CommentForm,
+    CommentEditForm,
+    PublisherForm,
+    PublisherFilterForm,
+    DatasetProjectAssignmentForm,
+    DatasetAnalysisForm,
+)
 from .chunk_uploads import append_chunk, remove_chunk_upload
 from user.access import partner_visible_datasets, user_can_access_dataset
 
@@ -242,12 +259,23 @@ class DatasetDetailView(LoginRequiredMixin, DetailView):
             return partner_visible_datasets(self.request.user).select_related(
                 'owner', 'category', 'publisher'
             ).prefetch_related(
-                'contributors', 'versions', 'versions__files',
-                'related_datasets', 'comments__author', 'projects',
+                'contributors',
+                'versions',
+                'versions__files',
+                'versions__columns',
+                'related_datasets',
+                'comments__author',
+                'projects',
             )
         # All authenticated users can see all datasets regardless of status
         return Dataset.objects.select_related('owner', 'category', 'publisher').prefetch_related(
-            'contributors', 'versions', 'versions__files', 'related_datasets', 'comments__author', 'projects'
+            'contributors',
+            'versions',
+            'versions__files',
+            'versions__columns',
+            'related_datasets',
+            'comments__author',
+            'projects',
         )
 
     def get_object(self, queryset=None):
@@ -291,6 +319,20 @@ class DatasetDetailView(LoginRequiredMixin, DetailView):
         context['analyses'] = dataset.analyses.all().select_related('uploaded_by').order_by('-uploaded_at')
         context['analysis_form'] = DatasetAnalysisForm(dataset=dataset, user=self.request.user)
         context['can_upload_analysis'] = self.request.user.is_authenticated
+
+        current_version = dataset.versions.filter(is_current=True).first()
+        context['current_version'] = current_version
+        if current_version:
+            context['current_version_columns'] = list(
+                current_version.columns.all()
+            )
+            context['can_edit_current_version_metadata'] = user_can_modify_dataset_version(
+                self.request.user,
+                current_version,
+            )
+        else:
+            context['current_version_columns'] = []
+            context['can_edit_current_version_metadata'] = False
         
         return context
 
@@ -538,6 +580,64 @@ class DatasetVersionFormMixin:
     def get_success_url(self):
         return reverse('datasets:dataset_detail', kwargs={'pk': self.dataset.pk})
 
+    def _version_for_column_formset(self):
+        if getattr(self, 'object', None) and self.object.pk:
+            return self.object
+        return DatasetVersion(dataset=self.dataset)
+
+    def build_column_formset(self, bind_post=False):
+        instance = self._version_for_column_formset()
+        if bind_post and self.request.method == 'POST':
+            return DatasetVersionColumnFormSet(
+                self.request.POST,
+                instance=instance if instance.pk else None,
+            )
+        if instance.pk:
+            return DatasetVersionColumnFormSet(instance=instance)
+        current = (
+            self.dataset.versions.filter(is_current=True)
+            .prefetch_related('columns')
+            .first()
+        )
+        initial = column_formset_initial_from_version(current) if current else []
+        return DatasetVersionColumnFormSet(
+            initial=initial,
+            queryset=DatasetVersionColumn.objects.none(),
+        )
+
+    def _save_column_formset(self):
+        self.column_formset = DatasetVersionColumnFormSet(
+            self.request.POST,
+            instance=self.object,
+        )
+        if not self.column_formset.is_valid():
+            raise ValidationError('Invalid column metadata.')
+        self.column_formset.save()
+
+    def _handle_column_formset_validation_error(self, form):
+        self.column_formset = DatasetVersionColumnFormSet(
+            self.request.POST,
+            instance=self.object if getattr(self.object, 'pk', None) else None,
+        )
+        for error in self.column_formset.non_form_errors():
+            form.add_error(None, error)
+        return self.form_invalid(form)
+
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        editing = getattr(self, 'object', None) and self.object.pk
+        if editing:
+            self.column_formset = DatasetVersionColumnFormSet(
+                self.request.POST,
+                instance=self.object,
+            )
+            if form.is_valid() and self.column_formset.is_valid():
+                return self.form_valid(form)
+        elif form.is_valid():
+            return self.form_valid(form)
+        self.column_formset = self.build_column_formset(bind_post=True)
+        return self.form_invalid(form)
+
     def get_context_data(self, **kwargs):
         from django.conf import settings
 
@@ -548,6 +648,12 @@ class DatasetVersionFormMixin:
             'datasets:dataset_version_upload_chunk',
             kwargs={'dataset_pk': self.dataset.pk},
         )
+        if 'column_formset' not in context:
+            context['column_formset'] = getattr(
+                self,
+                'column_formset',
+                None,
+            ) or self.build_column_formset()
         return context
 
     def form_invalid(self, form):
@@ -645,6 +751,11 @@ class DatasetVersionCreateView(LoginRequiredMixin, DatasetVersionFormMixin, Crea
                 if input_method == 'upload' and uploaded_files:
                     _save_version_upload_files(self.object, uploaded_files)
 
+                try:
+                    self._save_column_formset()
+                except ValidationError:
+                    return self._handle_column_formset_validation_error(form)
+
             if upload_id:
                 remove_chunk_upload(self.request.user.pk, upload_id)
 
@@ -685,6 +796,17 @@ class DatasetVersionCreateView(LoginRequiredMixin, DatasetVersionFormMixin, Crea
             
             messages.error(self.request, f'An error occurred while creating the version: {str(e)}')
             return self.form_invalid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self.request.method == 'GET':
+            current = self.dataset.versions.filter(is_current=True).first()
+            if current:
+                kwargs.setdefault('initial', {})
+                kwargs['initial'].update(
+                    data_description_initial_from_version(current)
+                )
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -743,6 +865,8 @@ class DatasetVersionUpdateView(LoginRequiredMixin, DatasetVersionFormMixin, Upda
                     _clear_version_files(self.object)
                     self.object.file_size = 0
                     self.object.save()
+
+                self.column_formset.save()
 
             if upload_id:
                 remove_chunk_upload(self.request.user.pk, upload_id)

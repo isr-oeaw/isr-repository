@@ -4,7 +4,17 @@ from django import forms
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from .models import Dataset, DatasetCategory, DatasetVersion, Comment, Publisher, DatasetAnalysis
+from django.forms import inlineformset_factory
+from django.utils.translation import gettext_lazy as _
+from .models import (
+    Dataset,
+    DatasetCategory,
+    DatasetVersion,
+    DatasetVersionColumn,
+    Comment,
+    Publisher,
+    DatasetAnalysis,
+)
 from projects.models import Project
 
 User = get_user_model()
@@ -232,6 +242,92 @@ class MultiFileField(forms.FileField):
         return cleaned_files
 
 
+class DatasetVersionColumnForm(forms.ModelForm):
+    """Single column/variable row for a dataset version."""
+
+    class Meta:
+        model = DatasetVersionColumn
+        fields = ['name', 'label', 'data_type', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'label': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'data_type': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'description': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('DELETE'):
+            return cleaned_data
+        name = (cleaned_data.get('name') or '').strip()
+        if not name:
+            if any((cleaned_data.get('label') or '').strip(),
+                   (cleaned_data.get('description') or '').strip()):
+                raise forms.ValidationError(_('Column name is required when other fields are filled.'))
+            cleaned_data['name'] = ''
+        else:
+            cleaned_data['name'] = name
+        return cleaned_data
+
+
+class DatasetVersionColumnFormSetBase(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        for form in self.forms:
+            if not hasattr(form, 'cleaned_data') or not form.cleaned_data:
+                continue
+            if form.cleaned_data.get('DELETE'):
+                continue
+            name = (form.cleaned_data.get('name') or '').strip()
+            label = (form.cleaned_data.get('label') or '').strip()
+            description = (form.cleaned_data.get('description') or '').strip()
+            if not name and not label and not description:
+                form.cleaned_data['DELETE'] = True
+
+    def save(self, commit=True):
+        instances = super().save(commit=commit)
+        if commit and getattr(self, 'instance', None) and self.instance.pk:
+            for position, column in enumerate(self.instance.columns.order_by('position', 'id')):
+                if column.position != position:
+                    column.position = position
+                    column.save(update_fields=['position'])
+        return instances
+
+
+DatasetVersionColumnFormSet = inlineformset_factory(
+    DatasetVersion,
+    DatasetVersionColumn,
+    form=DatasetVersionColumnForm,
+    formset=DatasetVersionColumnFormSetBase,
+    extra=1,
+    can_delete=True,
+)
+
+
+def column_formset_initial_from_version(version):
+    """Build formset initial rows from an existing version's columns."""
+    return [
+        {
+            'name': column.name,
+            'label': column.label,
+            'data_type': column.data_type,
+            'description': column.description,
+        }
+        for column in version.columns.all()
+    ]
+
+
+def data_description_initial_from_version(version):
+    """Summary field initial values copied from another version."""
+    return {
+        'temporal_start': version.temporal_start,
+        'temporal_end': version.temporal_end,
+        'spatial_coverage': version.spatial_coverage,
+        'unit_of_analysis': version.unit_of_analysis,
+        'observation_count': version.observation_count,
+    }
+
+
 class DatasetVersionForm(forms.ModelForm):
     """Form for creating and editing dataset versions"""
     
@@ -255,7 +351,18 @@ class DatasetVersionForm(forms.ModelForm):
     
     class Meta:
         model = DatasetVersion
-        fields = ['version_number', 'description', 'file_url', 'file_url_description', 'file_size_text']
+        fields = [
+            'version_number',
+            'description',
+            'temporal_start',
+            'temporal_end',
+            'spatial_coverage',
+            'unit_of_analysis',
+            'observation_count',
+            'file_url',
+            'file_url_description',
+            'file_size_text',
+        ]
         widgets = {
             'version_number': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -265,6 +372,26 @@ class DatasetVersionForm(forms.ModelForm):
                 'class': 'form-control',
                 'rows': 4,
                 'placeholder': 'Describe the changes in this version...'
+            }),
+            'temporal_start': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'class': 'form-control', 'type': 'date'},
+            ),
+            'temporal_end': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'class': 'form-control', 'type': 'date'},
+            ),
+            'spatial_coverage': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. Germany, NUTS-2',
+            }),
+            'unit_of_analysis': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. person, country-year',
+            }),
+            'observation_count': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 0,
             }),
             'file_url': forms.URLInput(attrs={
                 'class': 'form-control',
@@ -299,6 +426,11 @@ class DatasetVersionForm(forms.ModelForm):
         self.fields['file_url'].help_text = 'External URL where the file can be accessed'
         self.fields['file_url_description'].help_text = 'Optional: Describe where the file is located'
         self.fields['file_size_text'].help_text = 'Human-readable file size (e.g., "2.5 MB", "1.2 GB")'
+        self.fields['temporal_start'].help_text = _('Start of the time period covered by this version')
+        self.fields['temporal_end'].help_text = _('End of the time period covered by this version')
+        self.fields['spatial_coverage'].help_text = _('Geographic area covered by the data')
+        self.fields['unit_of_analysis'].help_text = _('What each row or record represents')
+        self.fields['observation_count'].help_text = _('Total number of rows or records')
         
         # Set initial field order
         self.fields['input_method'].label = 'File Input Method'
@@ -329,6 +461,13 @@ class DatasetVersionForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        temporal_start = cleaned_data.get('temporal_start')
+        temporal_end = cleaned_data.get('temporal_end')
+        if temporal_start and temporal_end and temporal_end < temporal_start:
+            raise forms.ValidationError(
+                _('Temporal coverage end must be on or after the start date.')
+            )
+
         input_method = cleaned_data.get('input_method')
         uploaded_files = cleaned_data.get('files') or []
         file_url = cleaned_data.get('file_url')

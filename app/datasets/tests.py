@@ -16,6 +16,7 @@ import uuid
 from .models import (
     Dataset,
     DatasetVersion,
+    DatasetVersionColumn,
     DatasetVersionFile,
     Comment,
     Publisher,
@@ -38,8 +39,15 @@ from .views import (
     upload_dataset_analysis, delete_dataset_analysis, download_dataset_analysis,
 )
 from .forms import (
-    DatasetForm, DatasetVersionForm, CommentForm, CommentEditForm,
-    DatasetProjectAssignmentForm, DatasetAnalysisForm,
+    DatasetForm,
+    DatasetVersionForm,
+    DatasetVersionColumnFormSet,
+    data_description_initial_from_version,
+    column_formset_initial_from_version,
+    CommentForm,
+    CommentEditForm,
+    DatasetProjectAssignmentForm,
+    DatasetAnalysisForm,
 )
 
 User = get_user_model()
@@ -682,6 +690,8 @@ class DatasetVersionChunkUploadTests(TestCase):
                         'file_size': len(content),
                     },
                 ]),
+                **version_metadata_fields(),
+                **empty_column_formset_for_create(),
             },
             HTTP_X_REQUESTED_WITH='XMLHttpRequest',
         )
@@ -1180,6 +1190,242 @@ class DatasetVersionModelTests(TestCase):
         self.assertTrue(version.has_file())
 
 
+def column_formset_post_data(prefix, rows, initial_forms=0):
+    """Build POST data for a dataset version column formset."""
+    data = {
+        f'{prefix}-TOTAL_FORMS': str(len(rows)),
+        f'{prefix}-INITIAL_FORMS': str(initial_forms),
+        f'{prefix}-MIN_NUM_FORMS': '0',
+        f'{prefix}-MAX_NUM_FORMS': '1000',
+    }
+    for index, row in enumerate(rows):
+        data[f'{prefix}-{index}-name'] = row.get('name', '')
+        data[f'{prefix}-{index}-label'] = row.get('label', '')
+        data[f'{prefix}-{index}-data_type'] = row.get('data_type', 'text')
+        data[f'{prefix}-{index}-description'] = row.get('description', '')
+        if row.get('DELETE'):
+            data[f'{prefix}-{index}-DELETE'] = 'on'
+        if row.get('id'):
+            data[f'{prefix}-{index}-id'] = str(row['id'])
+    return data
+
+
+def version_metadata_fields():
+    return {
+        'temporal_start': '',
+        'temporal_end': '',
+        'spatial_coverage': '',
+        'unit_of_analysis': '',
+        'observation_count': '',
+    }
+
+
+def empty_column_formset_for_version(version):
+    prefix = DatasetVersionColumnFormSet(instance=version).prefix
+    initial_forms = version.columns.count()
+    if initial_forms:
+        rows = [
+            {
+                'id': column.pk,
+                'name': column.name,
+                'label': column.label,
+                'data_type': column.data_type,
+                'description': column.description,
+            }
+            for column in version.columns.order_by('position', 'id')
+        ]
+        return column_formset_post_data(prefix, rows, initial_forms=initial_forms)
+    return column_formset_post_data(prefix, [{}], initial_forms=0)
+
+
+def empty_column_formset_for_create():
+    prefix = DatasetVersionColumnFormSet().prefix
+    return column_formset_post_data(prefix, [{}], initial_forms=0)
+
+
+class DatasetVersionDataDescriptionTests(TestCase):
+    """Tests for version-level data description metadata."""
+
+    def setUp(self):
+        self.temp_media = TemporaryDirectory()
+        self.override_media = override_settings(MEDIA_ROOT=self.temp_media.name)
+        self.override_media.enable()
+        self.addCleanup(self.override_media.disable)
+        self.addCleanup(self.temp_media.cleanup)
+
+        self.user = User.objects.create_user(
+            username='metauser',
+            email='metauser@example.com',
+            password='testpass123',
+        )
+        self.client = Client()
+        self.client.login(username='metauser', password='testpass123')
+        self.dataset = Dataset.objects.create(
+            title='Metadata Dataset',
+            description='Dataset for metadata tests',
+            owner=self.user,
+        )
+        self.column_prefix = DatasetVersionColumnFormSet().prefix
+
+    def test_form_rejects_temporal_end_before_start(self):
+        form = DatasetVersionForm(
+            data={
+                'version_number': '1.0',
+                'description': '',
+                'input_method': 'url',
+                'file_url': 'https://example.com/data.csv',
+                'file_url_description': '',
+                'file_size_text': '1 MB',
+                'temporal_start': '2020-06-01',
+                'temporal_end': '2019-01-01',
+                'spatial_coverage': '',
+                'unit_of_analysis': '',
+                'observation_count': '',
+            },
+            dataset=self.dataset,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn(
+            'Temporal coverage end must be on or after the start date.',
+            form.non_field_errors(),
+        )
+
+    def test_create_view_prefills_from_current_version(self):
+        current = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='1.0',
+            description='First',
+            created_by=self.user,
+            is_current=True,
+            temporal_start='2018-01-01',
+            temporal_end='2020-12-31',
+            spatial_coverage='Austria',
+            unit_of_analysis='person',
+            observation_count=500,
+        )
+        DatasetVersionColumn.objects.create(
+            version=current,
+            position=0,
+            name='age',
+            label='Age in years',
+            data_type='integer',
+        )
+
+        url = reverse('datasets:dataset_version_create', args=[self.dataset.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        form = response.context['form']
+        self.assertEqual(form.initial.get('spatial_coverage'), 'Austria')
+        self.assertEqual(form.initial.get('observation_count'), 500)
+
+        formset = response.context['column_formset']
+        self.assertEqual(len(formset.forms), 1)
+        self.assertEqual(formset.forms[0].initial.get('name'), 'age')
+
+        copied_initial = data_description_initial_from_version(current)
+        self.assertEqual(copied_initial['unit_of_analysis'], 'person')
+        column_initial = column_formset_initial_from_version(current)
+        self.assertEqual(column_initial[0]['name'], 'age')
+
+    def test_new_version_stores_submitted_metadata_and_columns(self):
+        current = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='1.0',
+            description='First',
+            created_by=self.user,
+            is_current=True,
+            spatial_coverage='Germany',
+        )
+        DatasetVersionColumn.objects.create(
+            version=current,
+            position=0,
+            name='year',
+            label='Survey year',
+            data_type='integer',
+        )
+
+        url = reverse('datasets:dataset_version_create', args=[self.dataset.pk])
+        upload = SimpleUploadedFile('v2.csv', b'year,value\n2020,1\n')
+        post_data = {
+            'version_number': '2.0',
+            'description': 'Updated schema',
+            'input_method': 'upload',
+            'file_url': '',
+            'file_url_description': '',
+            'file_size_text': '',
+            'temporal_start': '2019-01-01',
+            'temporal_end': '2021-12-31',
+            'spatial_coverage': 'Germany, NUTS-2',
+            'unit_of_analysis': 'region-year',
+            'observation_count': '1200',
+            **column_formset_post_data(
+                self.column_prefix,
+                [
+                    {'name': 'year', 'label': 'Survey year', 'data_type': 'integer'},
+                    {'name': 'value', 'label': 'Score', 'data_type': 'decimal'},
+                ],
+            ),
+        }
+        response = self.client.post(url, {**post_data, 'files': upload})
+        self.assertRedirects(response, reverse('datasets:dataset_detail', args=[self.dataset.pk]))
+
+        new_version = DatasetVersion.objects.get(dataset=self.dataset, version_number='2.0')
+        self.assertTrue(new_version.is_current)
+        self.assertEqual(new_version.spatial_coverage, 'Germany, NUTS-2')
+        self.assertEqual(new_version.observation_count, 1200)
+        column_names = list(new_version.columns.values_list('name', flat=True))
+        self.assertEqual(column_names, ['year', 'value'])
+
+        current.refresh_from_db()
+        self.assertFalse(current.is_current)
+        self.assertEqual(current.columns.count(), 1)
+
+    def test_detail_page_shows_current_version_metadata_only(self):
+        older = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='1.0',
+            description='Old',
+            created_by=self.user,
+            is_current=False,
+            spatial_coverage='Old coverage',
+        )
+        DatasetVersionColumn.objects.create(
+            version=older,
+            position=0,
+            name='legacy_var',
+            data_type='text',
+        )
+        current = DatasetVersion.objects.create(
+            dataset=self.dataset,
+            version_number='2.0',
+            description='Current',
+            created_by=self.user,
+            is_current=True,
+            spatial_coverage='Current coverage',
+            observation_count=42,
+        )
+        DatasetVersionColumn.objects.create(
+            version=current,
+            position=0,
+            name='active_var',
+            label='Active variable',
+            data_type='categorical',
+        )
+
+        url = reverse('datasets:dataset_detail', args=[self.dataset.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['current_version'], current)
+        self.assertEqual(
+            [column.name for column in response.context['current_version_columns']],
+            ['active_var'],
+        )
+        self.assertContains(response, 'Current coverage')
+        self.assertContains(response, 'active_var')
+        self.assertNotContains(response, 'legacy_var')
+
+
 class DatasetVersionEditDeleteTests(TestCase):
     """Tests for editing and deleting dataset versions."""
 
@@ -1301,6 +1547,8 @@ class DatasetVersionEditDeleteTests(TestCase):
                 'file_url': '',
                 'file_url_description': '',
                 'file_size_text': '',
+                **version_metadata_fields(),
+                **empty_column_formset_for_version(self.version),
             },
             follow=True,
         )
@@ -1364,6 +1612,8 @@ class DatasetVersionEditDeleteTests(TestCase):
                 'file_url': '',
                 'file_url_description': '',
                 'file_size_text': '',
+                **version_metadata_fields(),
+                **empty_column_formset_for_version(self.version),
                 'files': new_file,
             },
             follow=True,
@@ -1384,6 +1634,8 @@ class DatasetVersionEditDeleteTests(TestCase):
                 'file_url': 'https://example.com/data.csv',
                 'file_url_description': 'Hosted externally',
                 'file_size_text': '2 MB',
+                **version_metadata_fields(),
+                **empty_column_formset_for_version(self.version),
             },
             follow=True,
         )
