@@ -349,6 +349,36 @@ class DatasetVersion(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_current = models.BooleanField(default=False)
 
+    temporal_start = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_('Temporal coverage start'),
+        help_text=_('Start of the time period covered by this version'),
+    )
+    temporal_end = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_('Temporal coverage end'),
+        help_text=_('End of the time period covered by this version'),
+    )
+    spatial_coverage = models.CharField(
+        max_length=500,
+        blank=True,
+        verbose_name=_('Spatial coverage'),
+        help_text=_('Geographic area covered (e.g. Germany, NUTS-2)'),
+    )
+    unit_of_analysis = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name=_('Unit of analysis'),
+        help_text=_('e.g. person, household, country-year'),
+    )
+    observation_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_('Number of observations'),
+    )
+
     class Meta:
         ordering = ['-created_at']
         unique_together = ['dataset', 'version_number']
@@ -394,6 +424,65 @@ class DatasetVersion(models.Model):
         if hasattr(self, 'files') and self.files.exists():
             return True
         return bool(self.file_url or self.file_url_description)
+
+    def get_temporal_coverage_display(self):
+        """Human-readable temporal coverage for this version."""
+        if self.temporal_start and self.temporal_end:
+            return f'{self.temporal_start.isoformat()} – {self.temporal_end.isoformat()}'
+        if self.temporal_start:
+            return _('From %(date)s') % {'date': self.temporal_start.isoformat()}
+        if self.temporal_end:
+            return _('Until %(date)s') % {'date': self.temporal_end.isoformat()}
+        return ''
+
+    def has_data_description(self):
+        """True if this version has any data-description metadata."""
+        if any([
+            self.temporal_start,
+            self.temporal_end,
+            self.spatial_coverage.strip(),
+            self.unit_of_analysis.strip(),
+            self.observation_count is not None,
+        ]):
+            return True
+        return self.columns.exists()
+
+
+class DatasetVersionColumn(models.Model):
+    """Column/variable dictionary for a dataset version."""
+
+    DATA_TYPE_CHOICES = [
+        ('text', _('Text')),
+        ('integer', _('Integer')),
+        ('decimal', _('Decimal')),
+        ('date', _('Date')),
+        ('boolean', _('Boolean')),
+        ('categorical', _('Categorical')),
+    ]
+
+    version = models.ForeignKey(
+        DatasetVersion,
+        on_delete=models.CASCADE,
+        related_name='columns',
+    )
+    position = models.PositiveIntegerField(default=0)
+    name = models.CharField(max_length=255, verbose_name=_('Name'))
+    label = models.CharField(max_length=255, blank=True, verbose_name=_('Label'))
+    data_type = models.CharField(
+        max_length=20,
+        choices=DATA_TYPE_CHOICES,
+        default='text',
+        verbose_name=_('Data type'),
+    )
+    description = models.TextField(blank=True, verbose_name=_('Description'))
+
+    class Meta:
+        ordering = ['position', 'id']
+        verbose_name = _('Dataset version column')
+        verbose_name_plural = _('Dataset version columns')
+
+    def __str__(self):
+        return self.name
 
 
 class DatasetVersionFile(models.Model):
@@ -582,6 +671,7 @@ auditlog.register(Publisher)
 auditlog.register(Dataset)
 auditlog.register(DatasetCategory)
 auditlog.register(DatasetVersion)
+auditlog.register(DatasetVersionColumn)
 auditlog.register(DatasetVersionFile)
 auditlog.register(Comment)
 auditlog.register(DatasetDownload)

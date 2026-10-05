@@ -2,7 +2,15 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import Dataset, DatasetCategory, DatasetVersion, DatasetDownload, Comment, Publisher
+from .models import (
+    Dataset,
+    DatasetCategory,
+    DatasetVersion,
+    DatasetVersionColumn,
+    DatasetDownload,
+    Comment,
+    Publisher,
+)
 
 
 @admin.register(Publisher)
@@ -114,6 +122,13 @@ class DatasetAdmin(admin.ModelAdmin):
     projects_display.short_description = 'Projects'
 
 
+class DatasetVersionColumnInline(admin.TabularInline):
+    model = DatasetVersionColumn
+    extra = 1
+    fields = ['position', 'name', 'label', 'data_type', 'description']
+    ordering = ['position', 'id']
+
+
 @admin.register(DatasetVersion)
 class DatasetVersionAdmin(admin.ModelAdmin):
     list_display = ['dataset', 'version_number', 'created_by', 'file_size_display', 'is_current', 'created_at']
@@ -121,6 +136,39 @@ class DatasetVersionAdmin(admin.ModelAdmin):
     search_fields = ['dataset__title', 'version_number', 'description']
     readonly_fields = ['created_at']
     ordering = ['-created_at']
+    inlines = [DatasetVersionColumnInline]
+    fieldsets = (
+        (None, {
+            'fields': (
+                'dataset',
+                'version_number',
+                'description',
+                'is_current',
+                'created_by',
+            ),
+        }),
+        ('Data description', {
+            'fields': (
+                'temporal_start',
+                'temporal_end',
+                'spatial_coverage',
+                'unit_of_analysis',
+                'observation_count',
+            ),
+        }),
+        ('Files', {
+            'fields': (
+                'file',
+                'file_size',
+                'file_size_text',
+                'file_url',
+                'file_url_description',
+            ),
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+        }),
+    )
 
     def file_size_display(self, obj):
         if obj.file_size == 0:

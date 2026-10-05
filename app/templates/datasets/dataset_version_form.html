@@ -103,6 +103,129 @@
                             </div>
                         </div>
 
+                        <!-- Data description -->
+                        <div class="card border mb-4">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-table me-2"></i>
+                                    {% trans "Data description" %}
+                                </h6>
+                                <p class="small text-muted mb-0 mt-1">
+                                    {% trans "Describe the structure and coverage of this version's data (columns, time period, geography)." %}
+                                </p>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.temporal_start.id_for_label }}" class="form-label">{% trans "Time period start" %}</label>
+                                        <input type="date"
+                                               name="{{ form.temporal_start.name }}"
+                                               id="{{ form.temporal_start.id_for_label }}"
+                                               class="form-control {% if form.temporal_start.errors %}is-invalid{% endif %}"
+                                               value="{{ form.temporal_start.value|date:'Y-m-d'|default:form.temporal_start.value|default:'' }}">
+                                        {% if form.temporal_start.errors %}
+                                        <div class="invalid-feedback">{{ form.temporal_start.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="{{ form.temporal_end.id_for_label }}" class="form-label">{% trans "Time period end" %}</label>
+                                        <input type="date"
+                                               name="{{ form.temporal_end.name }}"
+                                               id="{{ form.temporal_end.id_for_label }}"
+                                               class="form-control {% if form.temporal_end.errors %}is-invalid{% endif %}"
+                                               value="{{ form.temporal_end.value|date:'Y-m-d'|default:form.temporal_end.value|default:'' }}">
+                                        {% if form.temporal_end.errors %}
+                                        <div class="invalid-feedback">{{ form.temporal_end.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="{{ form.spatial_coverage.id_for_label }}" class="form-label">{% trans "Geographic coverage" %}</label>
+                                        {{ form.spatial_coverage }}
+                                        {% if form.spatial_coverage.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.spatial_coverage.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="{{ form.unit_of_analysis.id_for_label }}" class="form-label">{% trans "Unit of analysis" %}</label>
+                                        {{ form.unit_of_analysis }}
+                                        {% if form.unit_of_analysis.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.unit_of_analysis.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="{{ form.observation_count.id_for_label }}" class="form-label">{% trans "Number of observations" %}</label>
+                                        {{ form.observation_count }}
+                                        {% if form.observation_count.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.observation_count.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                {{ column_formset.management_form }}
+                                {% if column_formset.non_form_errors %}
+                                <div class="alert alert-danger">{{ column_formset.non_form_errors }}</div>
+                                {% endif %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle" id="column-formset-table">
+                                        <thead>
+                                            <tr>
+                                                <th>{% trans "Name" %} <span class="text-danger">*</span></th>
+                                                <th>{% trans "Label" %}</th>
+                                                <th>{% trans "Type" %}</th>
+                                                <th>{% trans "Description" %}</th>
+                                                <th class="text-center">{% trans "Remove" %}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="column-formset-body">
+                                            {% for column_form in column_formset %}
+                                            <tr class="column-form-row">
+                                                {% for hidden in column_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                <td>
+                                                    {{ column_form.name }}
+                                                    {% if column_form.name.errors %}
+                                                    <div class="text-danger small">{{ column_form.name.errors.0 }}</div>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ column_form.label }}</td>
+                                                <td>{{ column_form.data_type }}</td>
+                                                <td>{{ column_form.description }}</td>
+                                                <td class="text-center">
+                                                    {% if column_form.DELETE %}
+                                                    <div class="form-check d-inline-block">
+                                                        {{ column_form.DELETE }}
+                                                    </div>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="add-column-row">
+                                    <i class="bi bi-plus-lg me-1"></i>
+                                    {% trans "Add column" %}
+                                </button>
+                                <table class="d-none" aria-hidden="true">
+                                    <tbody id="empty-column-row-template">
+                                        <tr class="column-form-row">
+                                            {% with column_form=column_formset.empty_form %}
+                                            {% for hidden in column_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                            <td>{{ column_form.name }}</td>
+                                            <td>{{ column_form.label }}</td>
+                                            <td>{{ column_form.data_type }}</td>
+                                            <td>{{ column_form.description }}</td>
+                                            <td class="text-center">
+                                                {% if column_form.DELETE %}
+                                                <div class="form-check d-inline-block">{{ column_form.DELETE }}</div>
+                                                {% endif %}
+                                            </td>
+                                            {% endwith %}
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- File Input Method Selection -->
                         <div class="mb-4">
                             <label class="form-label">
@@ -334,6 +457,37 @@
 </div>
 
 <script>
+(function initColumnFormset() {
+    const addBtn = document.getElementById('add-column-row');
+    const body = document.getElementById('column-formset-body');
+    const totalFormsInput = document.querySelector('[name="{{ column_formset.prefix }}-TOTAL_FORMS"]');
+    const templateRow = document.querySelector('#empty-column-row-template tr');
+    if (!addBtn || !body || !totalFormsInput || !templateRow) {
+        return;
+    }
+    addBtn.addEventListener('click', function () {
+        const formIndex = parseInt(totalFormsInput.value, 10);
+        const newRow = templateRow.cloneNode(true);
+        newRow.querySelectorAll('[name],[id],[for]').forEach(function (el) {
+            ['name', 'id', 'for'].forEach(function (attr) {
+                const val = el.getAttribute(attr);
+                if (val) {
+                    el.setAttribute(attr, val.replace(/__prefix__/g, formIndex));
+                }
+            });
+        });
+        newRow.querySelectorAll('input, select, textarea').forEach(function (input) {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else {
+                input.value = '';
+            }
+        });
+        body.appendChild(newRow);
+        totalFormsInput.value = formIndex + 1;
+    });
+})();
+
 // File upload tracking
 let uploadedFiles = [];
 let isUploading = false;

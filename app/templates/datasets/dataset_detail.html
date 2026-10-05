@@ -74,6 +74,96 @@
                 </div>
             </div>
 
+            <!-- Data description (current version) -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0">
+                        <i class="bi bi-table me-2"></i>
+                        {% trans "Data description" %}
+                        {% if current_version %}
+                        <span class="badge bg-primary ms-2">v{{ current_version.version_number }}</span>
+                        <span class="badge bg-success">{% trans "Latest" %}</span>
+                        {% endif %}
+                    </h5>
+                    {% if current_version and can_edit_current_version_metadata %}
+                    <a href="{% url 'datasets:dataset_version_edit' dataset.pk current_version.pk %}"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-pencil me-1"></i>
+                        {% trans "Edit metadata" %}
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if current_version and current_version.has_data_description %}
+                    <div class="row g-3 mb-4">
+                        {% if current_version.get_temporal_coverage_display %}
+                        <div class="col-md-6 col-lg-4">
+                            <strong class="text-muted d-block small">{% trans "Time period" %}</strong>
+                            {{ current_version.get_temporal_coverage_display }}
+                        </div>
+                        {% endif %}
+                        {% if current_version.spatial_coverage %}
+                        <div class="col-md-6 col-lg-4">
+                            <strong class="text-muted d-block small">{% trans "Geographic coverage" %}</strong>
+                            {{ current_version.spatial_coverage }}
+                        </div>
+                        {% endif %}
+                        {% if current_version.unit_of_analysis %}
+                        <div class="col-md-6 col-lg-4">
+                            <strong class="text-muted d-block small">{% trans "Unit of analysis" %}</strong>
+                            {{ current_version.unit_of_analysis }}
+                        </div>
+                        {% endif %}
+                        {% if current_version.observation_count is not None %}
+                        <div class="col-md-6 col-lg-4">
+                            <strong class="text-muted d-block small">{% trans "Observations" %}</strong>
+                            {{ current_version.observation_count|floatformat:0 }}
+                        </div>
+                        {% endif %}
+                        {% if current_version_columns %}
+                        <div class="col-md-6 col-lg-4">
+                            <strong class="text-muted d-block small">{% trans "Variables" %}</strong>
+                            {{ current_version_columns|length }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if current_version_columns %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{% trans "Name" %}</th>
+                                    <th>{% trans "Label" %}</th>
+                                    <th>{% trans "Type" %}</th>
+                                    <th>{% trans "Description" %}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for column in current_version_columns %}
+                                <tr>
+                                    <td><code>{{ column.name }}</code></td>
+                                    <td>{{ column.label|default:"—" }}</td>
+                                    <td>{{ column.get_data_type_display }}</td>
+                                    <td>{{ column.description|default:"—" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+                    {% elif current_version %}
+                    <p class="text-muted mb-0">
+                        {% trans "No data description has been added for the latest version yet." %}
+                        {% if can_edit_current_version_metadata %}
+                        <a href="{% url 'datasets:dataset_version_edit' dataset.pk current_version.pk %}">{% trans "Add metadata" %}</a>
+                        {% endif %}
+                    </p>
+                    {% else %}
+                    <p class="text-muted mb-0">{% trans "Add a dataset version to describe columns and time coverage." %}</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Tags -->
             {% if dataset.get_tags_list %}
             <div class="card mb-4">
