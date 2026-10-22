@@ -5,14 +5,14 @@ A comprehensive Django-based platform for managing, accessing, and analyzing res
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Django 5.2.6
+- **Backend**: Django 6.1
 - **Database**: PostgreSQL 15 with PostGIS 3.3
 - **Frontend**: Bootstrap 5.3.3, Bootstrap Icons
 - **Authentication**: Django Allauth
 - **Containerization**: Docker & Docker Compose
 - **Web Server**: Nginx
-- **Geospatial**: GDAL 3.6.2
-- **Python**: 3.13
+- **Geospatial**: GDAL 3.6.2 (system library in Docker/CI)
+- **Python**: 3.15
 
 ## 📋 Prerequisites
 

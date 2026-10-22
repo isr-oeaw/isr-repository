@@ -20,7 +20,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     container:
-      image: python:3.13-slim-bookworm
+      image: python:3.15-slim-bookworm
 
     services:
       postgres:
@@ -65,14 +65,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py3.13-${{ hashFiles('requirements.txt') }}
+          key: pip-${{ runner.os }}-py3.15-${{ hashFiles('requirements.txt') }}
           restore-keys: |
-            pip-${{ runner.os }}-py3.13-
+            pip-${{ runner.os }}-py3.15-
 
       - name: Install Python dependencies
-        env:
-          CPLUS_INCLUDE_PATH: /usr/include/gdal
-          C_INCLUDE_PATH: /usr/include/gdal
         run: pip install -r requirements.txt
 
       - name: Run tests

@@ -1,4 +1,4 @@
-FROM python:slim
+FROM python:3.15-slim-bookworm
 
 # Install runtime dependencies
 RUN apt-get update && \
